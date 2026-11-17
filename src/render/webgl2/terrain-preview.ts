@@ -676,12 +676,17 @@ export class TerrainPreviewRenderer {
         path.push(current);
       }
       const sections:{x:number;z:number;y:number;w:number}[]=[];
+      let terminalIndex=path[0];
       const subdivisions=8;
       for(let segment=0;segment<path.length-1;segment++){
         const p0=point(path[Math.max(0,segment-1)]);
         const p1=point(path[segment]);
         const p2=point(path[segment+1]);
         const p3=point(path[Math.min(path.length-1,segment+2)]);
+        const segmentKey=path[segment]+":"+path[segment+1];
+        if(renderedSegments.has(segmentKey))continue;
+        renderedSegments.add(segmentKey);
+        terminalIndex=path[segment+1];
         for(let step=0;step<subdivisions;step++){
           const t=step/subdivisions;
           const x=catmull(p0.x,p1.x,p2.x,p3.x,t);
@@ -690,7 +695,7 @@ export class TerrainPreviewRenderer {
           sections.push({x,z,y:sampleElevation(field,x,z)+0.0018,w:width});
         }
       }
-      const last=point(path[path.length-1]);
+      const last=point(terminalIndex);
       sections.push({...last,y:sampleElevation(field,last.x,last.z)+0.0018});
       const edges=sections.map((section,index)=>{
         const previous=sections[Math.max(0,index-1)],next=sections[Math.min(sections.length-1,index+1)];
