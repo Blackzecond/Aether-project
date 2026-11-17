@@ -22,6 +22,7 @@ const seedInput = requiredElement<HTMLInputElement>("#seed");
 const scaleInput = requiredElement<HTMLInputElement>("#scale");
 const roughnessInput = requiredElement<HTMLInputElement>("#roughness");
 const detailInput = requiredElement<HTMLInputElement>("#detail");
+const mistInput = requiredElement<HTMLInputElement>("#mist");
 const renderStatus = requiredElement<HTMLElement>("#render-status");
 const seedLabel = requiredElement<HTMLElement>("#seed-label");
 const resolutionLabel = requiredElement<HTMLElement>("#resolution-label");
@@ -41,12 +42,13 @@ const context = (() => {
 
 const outputDefinition: GraphNodeDefinition = {
   type: "landscape.compose",
-  inputs: ["scale", "roughness", "octaves"],
-  outputs: ["scale", "roughness", "octaves"],
+  inputs: ["scale", "roughness", "octaves", "mist"],
+  outputs: ["scale", "roughness", "octaves", "mist"],
   evaluate: (inputs) => ({
     scale: typeof inputs.scale === "number" ? inputs.scale : Number(scaleInput.value),
     roughness: typeof inputs.roughness === "number" ? inputs.roughness : Number(roughnessInput.value),
     octaves: typeof inputs.octaves === "number" ? inputs.octaves : Number(detailInput.value),
+    mist: typeof inputs.mist === "number" ? inputs.mist : Number(mistInput.value),
   }),
 };
 const registry = new Map(createCoreNodeRegistry());
@@ -54,7 +56,7 @@ registry.set(outputDefinition.type, outputDefinition);
 
 const STORAGE_KEY = "aether.graph.v2";
 const LEGACY_STORAGE_KEY = "aether.graph.v1";
-const DEFAULT_NODE_IDS = new Set(["scale", "roughness", "detail", "landscape"]);
+const DEFAULT_NODE_IDS = new Set(["scale", "roughness", "detail", "mist", "landscape"]);
 
 function createDefaultGraph(): GraphDocument {
   return {
@@ -62,13 +64,15 @@ function createDefaultGraph(): GraphDocument {
       { id: "scale", type: "number.constant", params: { value: Number(scaleInput.value) } },
       { id: "roughness", type: "number.constant", params: { value: Number(roughnessInput.value) } },
       { id: "detail", type: "number.constant", params: { value: Number(detailInput.value) } },
+      { id: "mist", type: "number.constant", params: { value: Number(mistInput.value) } },
       { id: "landscape", type: "landscape.compose" },
     ],
-    layout: { scale: { x: 40, y: 40 }, roughness: { x: 330, y: 40 }, detail: { x: 40, y: 320 }, landscape: { x: 330, y: 320 } },
+    layout: { scale: { x: 40, y: 40 }, roughness: { x: 330, y: 40 }, detail: { x: 40, y: 320 }, mist: { x: 40, y: 600 }, landscape: { x: 330, y: 320 } },
     edges: [
       { id: "e-scale", fromNodeId: "scale", fromPort: "value", toNodeId: "landscape", toPort: "scale" },
       { id: "e-roughness", fromNodeId: "roughness", fromPort: "value", toNodeId: "landscape", toPort: "roughness" },
       { id: "e-detail", fromNodeId: "detail", fromPort: "value", toNodeId: "landscape", toPort: "octaves" },
+      { id: "e-mist", fromNodeId: "mist", fromPort: "value", toNodeId: "landscape", toPort: "mist" },
     ],
   };
 }
@@ -121,9 +125,11 @@ function syncControlsFromGraph(): void {
   const scale = valueFor("scale");
   const roughness = valueFor("roughness");
   const detail = valueFor("detail");
+  const mist = valueFor("mist");
   if (scale !== null) scaleInput.value = String(scale);
   if (roughness !== null) roughnessInput.value = String(roughness);
   if (detail !== null) detailInput.value = String(detail);
+  if (mist !== null) mistInput.value = String(mist);
 }
 
 syncControlsFromGraph();
@@ -139,7 +145,7 @@ function evaluateLandscapeGraph() {
     }
     return value;
   };
-  return { scale: number("scale"), roughness: number("roughness"), octaves: number("octaves") };
+  return { scale: number("scale"), roughness: number("roughness"), octaves: number("octaves"), mist: number("mist") };
 }
 
 function readOptions() {
@@ -280,6 +286,7 @@ function updateOutputs(): void {
   requiredElement<HTMLOutputElement>("#scale-value").textContent = options.scale.toFixed(1);
   requiredElement<HTMLOutputElement>("#roughness-value").textContent = options.roughness.toFixed(2);
   requiredElement<HTMLOutputElement>("#detail-value").textContent = String(options.octaves);
+  requiredElement<HTMLOutputElement>("#mist-value").textContent = Math.round(options.mist * 100) + "%";
 }
 
 function render(): void {
@@ -345,16 +352,17 @@ function updateBaseNode(id: string, value: number): void {
 }
 
 function applyLandscapePreset(name: string): void {
-  const presets: Record<string, { scale: number; roughness: number; detail: number }> = {
-    soft: { scale: 0.8, roughness: 0.3, detail: 3 },
-    rugged: { scale: 1.5, roughness: 0.8, detail: 5 },
-    detailed: { scale: 1.9, roughness: 0.55, detail: 6 },
+  const presets: Record<string, { scale: number; roughness: number; detail: number; mist: number }> = {
+    soft: { scale: 0.8, roughness: 0.3, detail: 3, mist: 0.72 },
+    rugged: { scale: 1.5, roughness: 0.8, detail: 5, mist: 0.12 },
+    detailed: { scale: 1.9, roughness: 0.55, detail: 6, mist: 0.32 },
   };
   const preset = presets[name];
   if (!preset) return;
   updateBaseNode("scale", preset.scale);
   updateBaseNode("roughness", preset.roughness);
   updateBaseNode("detail", preset.detail);
+  updateBaseNode("mist", preset.mist);
   syncControlsFromGraph();
   document.querySelectorAll<HTMLButtonElement>("[data-preset]").forEach((button) => {
     const active = button.dataset.preset === name;
@@ -368,11 +376,12 @@ document.querySelectorAll<HTMLButtonElement>("[data-preset]").forEach((button) =
   button.addEventListener("click", () => applyLandscapePreset(button.dataset.preset ?? ""));
 });
 
-for (const input of [seedInput, scaleInput, roughnessInput, detailInput]) {
+for (const input of [seedInput, scaleInput, roughnessInput, detailInput, mistInput]) {
   input.addEventListener("input", () => {
     if (input === scaleInput) updateBaseNode("scale", Number(input.value));
     if (input === roughnessInput) updateBaseNode("roughness", Number(input.value));
     if (input === detailInput) updateBaseNode("detail", Number(input.value));
+    if (input === mistInput) updateBaseNode("mist", Number(input.value));
     scheduleRender();
   });
   input.addEventListener("change", saveGraph);
