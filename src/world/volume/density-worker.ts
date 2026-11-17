@@ -10,17 +10,28 @@ interface WorkerScope {
 const scope=self as unknown as WorkerScope;
 scope.onmessage=(event:MessageEvent<Request>):void=>{
   const {id,recipe,resolution}=event.data;
-  try{
-    const world=generateDensityWorld(recipe,resolution);
-    const heightfield=world.heightfield,mesh=world.mesh;
-    const response={
-      id,ok:true as const,
-      heightfield:{width:heightfield.width,height:heightfield.height,bounds:heightfield.bounds,values:heightfield.values.buffer},
-      mesh:{positions:mesh.positions.buffer,normals:mesh.normals.buffer,indices:mesh.indices.buffer,vertexCount:mesh.vertexCount,triangleCount:mesh.triangleCount,chunks:mesh.chunks,lods:mesh.lods.map(lod=>({positions:lod.positions.buffer,normals:lod.normals.buffer,indices:lod.indices.buffer,vertexCount:lod.vertexCount,triangleCount:lod.triangleCount,chunks:lod.chunks}))},
-      diagnostics:world.diagnostics,
-    };
-    const transfers:Transferable[]=[heightfield.values.buffer,mesh.positions.buffer,mesh.normals.buffer,mesh.indices.buffer];\n    for(const lod of mesh.lods.slice(1)){transfers.push(lod.positions.buffer,lod.normals.buffer,lod.indices.buffer);}\n    scope.postMessage(response,transfers);
-  }catch(error){
-    scope.postMessage({id,ok:false as const,error:error instanceof Error?error.message:"Density generation failed"});
-  }
+  void (async()=>{
+    try{
+      const world=await generateDensityWorldGpu(recipe,resolution)??generateDensityWorld(recipe,resolution);
+      const heightfield=world.heightfield,mesh=world.mesh;
+      const response={
+        id,ok:true as const,
+        heightfield:{width:heightfield.width,height:heightfield.height,bounds:heightfield.bounds,values:heightfield.values.buffer},
+        mesh:{
+          positions:mesh.positions.buffer,normals:mesh.normals.buffer,indices:mesh.indices.buffer,
+          vertexCount:mesh.vertexCount,triangleCount:mesh.triangleCount,chunks:mesh.chunks,
+          lods:mesh.lods.map(lod=>({
+            positions:lod.positions.buffer,normals:lod.normals.buffer,indices:lod.indices.buffer,
+            vertexCount:lod.vertexCount,triangleCount:lod.triangleCount,chunks:lod.chunks,
+          })),
+        },
+        diagnostics:world.diagnostics,
+      };
+      const transfers:Transferable[]=[heightfield.values.buffer,mesh.positions.buffer,mesh.normals.buffer,mesh.indices.buffer];
+      for(const lod of mesh.lods.slice(1))transfers.push(lod.positions.buffer,lod.normals.buffer,lod.indices.buffer);
+      scope.postMessage(response,transfers);
+    }catch(error){
+      scope.postMessage({id,ok:false as const,error:error instanceof Error?error.message:"Density generation failed"});
+    }
+  })();
 };
