@@ -66,17 +66,26 @@ float fbm2(vec2 p) {
   return value;
 }
 vec3 terrainColor(float height, float slope) {
-  vec3 low = vec3(0.105, 0.205, 0.17);
-  vec3 grass = vec3(0.29, 0.43, 0.29);
-  vec3 highland = vec3(0.49, 0.48, 0.35);
-  vec3 rock = vec3(0.49, 0.46, 0.40);
+  vec3 valley = vec3(0.13, 0.22, 0.15);
+  vec3 meadow = vec3(0.25, 0.39, 0.21);
+  vec3 alpineGrass = vec3(0.34, 0.39, 0.24);
+  vec3 earth = vec3(0.39, 0.29, 0.19);
+  vec3 weatheredRock = vec3(0.39, 0.38, 0.33);
+  vec3 paleStone = vec3(0.57, 0.54, 0.46);
   vec3 snow = vec3(0.82, 0.84, 0.78);
-  vec3 color = mix(low, grass, smoothstep(0.04, 0.28, height));
-  color = mix(color, highland, smoothstep(0.30, 0.57, height));
-  color = mix(color, rock, smoothstep(0.62, 0.82, height));
-  color = mix(color, snow, smoothstep(0.88, 1.04, height));
-  float exposedRock = smoothstep(0.22, 0.66, slope) * (1.0 - smoothstep(0.82, 1.0, height));
-  return mix(color, rock, exposedRock * 0.68);
+  vec3 color = mix(valley, meadow, smoothstep(0.035, 0.24, height));
+  color = mix(color, alpineGrass, smoothstep(0.27, 0.48, height));
+  color = mix(color, earth, smoothstep(0.46, 0.66, height));
+  color = mix(color, weatheredRock, smoothstep(0.65, 0.84, height));
+  color = mix(color, paleStone, smoothstep(0.82, 0.94, height));
+  color = mix(color, snow, smoothstep(0.96, 1.08, height));
+  float exposedRock = smoothstep(0.24, 0.68, slope);
+  float highRock = smoothstep(0.58, 0.82, height);
+  color = mix(color, weatheredRock, exposedRock * (0.48 + highRock * 0.30));
+  float soilPatches = fbm2(vec2(height * 17.0, vPosition.x * 23.0 + vPosition.z * 19.0));
+  color = mix(color, earth * (0.88 + soilPatches * 0.22),
+    (1.0 - exposedRock) * smoothstep(0.38, 0.70, height) * 0.42);
+  return color;
 }
 
 void main() {
@@ -207,7 +216,7 @@ function buildTreeGeometry(): Float32Array {
   };
   const cone=(bottom:number,top:number,radius:number,segments=7) => {const apex=[0,top,0];for(let i=0;i<segments;i++){const a=i/segments*Math.PI*2,b=(i+1)/segments*Math.PI*2;tri([Math.cos(a)*radius,bottom,Math.sin(a)*radius],apex,[Math.cos(b)*radius,bottom,Math.sin(b)*radius]);}};
   const cylinder=(bottom:number,top:number,radius:number,segments=6) => {for(let i=0;i<segments;i++){const a=i/segments*Math.PI*2,b=(i+1)/segments*Math.PI*2,p1=[Math.cos(a)*radius,bottom,Math.sin(a)*radius],p2=[Math.cos(b)*radius,bottom,Math.sin(b)*radius],p3=[Math.cos(a)*radius,top,Math.sin(a)*radius],p4=[Math.cos(b)*radius,top,Math.sin(b)*radius];tri(p1,p3,p2);tri(p2,p3,p4);}};
-  cylinder(0,0.39,0.045);cone(0.18,0.60,0.25);cone(0.37,0.81,0.19);cone(0.56,1,0.125);
+  cylinder(0,0.39,0.045);cone(0.16,0.61,0.34,9);cone(0.34,0.83,0.27,9);cone(0.54,1,0.19,9);
   return new Float32Array(out);
 }
 
