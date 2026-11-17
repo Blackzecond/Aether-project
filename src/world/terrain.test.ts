@@ -6,6 +6,7 @@ import { buildHeightfieldMesh } from "./mesh/heightfield-mesh";
 import { createHeightfield } from "./fields/heightfield";
 import { buildDrainageField } from "./hydrology/drainage";
 import { extractRiverNetwork } from "./hydrology/rivers";
+import { generateVegetation } from "./ecology/vegetation";
 function recipe(overrides: Partial<typeof DEFAULT_TERRAIN_RECIPE["landform"]> = {}) {
   return { ...DEFAULT_TERRAIN_RECIPE, landform: { ...DEFAULT_TERRAIN_RECIPE.landform, ...overrides } };
 }
@@ -65,8 +66,10 @@ describe("world foundation v2", () => {
     expect(mesh.vertexCount).toBe(expectedVertices);
     expect(mesh.triangleCount).toBe(expectedTriangles);
     expect(mesh.indices.length).toBe(expectedTriangles * 3);
-    expect(Math.max(...Array.from(mesh.indices))).toBeLessThan(mesh.vertexCount);
-    expect(Math.min(...Array.from(mesh.indices))).toBeGreaterThanOrEqual(0);
+    const maximumIndex = mesh.indices.reduce((maximum, value) => Math.max(maximum, value), 0);
+    const minimumIndex = mesh.indices.reduce((minimum, value) => Math.min(minimum, value), Infinity);
+    expect(maximumIndex).toBeLessThan(mesh.vertexCount);
+    expect(minimumIndex).toBeGreaterThanOrEqual(0);
     expect(Array.from(mesh.normals).every(Number.isFinite)).toBe(true);
     expect(Array.from(mesh.positions).every(Number.isFinite)).toBe(true);
   });
@@ -162,6 +165,17 @@ describe("world foundation v2", () => {
     const field = generateTerrain(recipe()).heightfield;
     const drainage = buildDrainageField(field);
     expect(() => extractRiverNetwork(field, drainage, { minimumContributingArea: 0 })).toThrow();
+  });
+  it("generates deterministic vegetation on suitable terrain", () => {
+    const field = generateTerrain(recipe()).heightfield;
+    const first = generateVegetation(field, 7341);
+    const second = generateVegetation(field, 7341);
+    expect(first.instances).toEqual(second.instances);
+    expect(first.instances.length).toBeGreaterThan(0);
+    expect(first.diagnostics.trees).toBe(first.instances.length);
+    expect(first.instances.every(tree => tree.height > 0 && tree.y > 0
+      && tree.x >= field.bounds.minX && tree.x <= field.bounds.maxX
+      && tree.z >= field.bounds.minZ && tree.z <= field.bounds.maxZ)).toBe(true);
   });
   it("isolates subsystem seeds", () => {
     expect(deriveSubsystemSeed(42, "forest")).toBe(deriveSubsystemSeed(42, "forest"));
