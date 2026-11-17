@@ -108,12 +108,12 @@ export function generateVegetation(
       else kind = patch > 0.5 ? 1 : 0;
 
       const scale = kind === 3
-        ? 0.0022 + hash(seed + 181, gx, gz) * 0.0038
+        ? 0.0012 + hash(seed + 181, gx, gz) * 0.0026
         : kind === 2
-          ? 0.0020 + hash(seed + 181, gx, gz) * 0.0025
+          ? 0.0005 + hash(seed + 181, gx, gz) * 0.0007
           : kind === 1
-            ? 0.0035 + hash(seed + 181, gx, gz) * 0.0045
-            : 0.0025 + hash(seed + 181, gx, gz) * 0.0035;
+            ? 0.0014 + hash(seed + 181, gx, gz) * 0.0014
+            : 0.00035 + hash(seed + 181, gx, gz) * 0.0005;
       groundCover.push({
         x, y: surface.elevation * 1.18 + 0.0012, z, scale,
         tint: hash(seed + 193, gx, gz), kind,
