@@ -55,3 +55,16 @@ Future graph types should explicitly distinguish scalar, vector, color, curve, g
 3. Conservative mobile render sizing.
 4. Build and typecheck scripts.
 5. Research notes and performance decisions kept in the repository.
+
+
+## Shared landscape world model
+
+The first landscape generator now evaluates a single deterministic world model before drawing any environment elements.
+
+- Terrain profiles are sampled once per depth layer and reused by terrain rendering, vegetation placement, and river routing.
+- The river route is anchored to a low valley in the middle terrain profile, then searches nearby low corridors in the foreground profile as it approaches the viewer.
+- River width grows with normalized depth to create perspective; its channel banks and highlights follow the same centerline.
+- Trees are grounded against the terrain profile for their layer and are kept clear of the river channel.
+- Changing terrain scale, roughness, detail, or seed regenerates the shared profiles, so dependent elements change with the terrain rather than remaining independent overlays.
+
+This is an intentionally lightweight 2.5D height-profile model for the Canvas preview. It establishes shared data contracts before moving to a full 2D height field, terrain masks, occlusion, and more physically grounded water flow.
