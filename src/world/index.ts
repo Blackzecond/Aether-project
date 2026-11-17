@@ -6,3 +6,4 @@ export * from "./terrain/noise";
 export * from "./mesh/heightfield-mesh";
 
 export * from "./hydrology/drainage";
+export * from "./hydrology/rivers";
