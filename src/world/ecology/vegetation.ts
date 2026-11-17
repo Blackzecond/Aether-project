@@ -8,9 +8,19 @@ export interface VegetationInstance {
   readonly height: number;
   readonly tint: number;
 }
+export interface GroundCoverInstance {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly scale: number;
+  readonly tint: number;
+  /** 0 grass, 1 fern, 2 moss, 3 rock. */
+  readonly kind: 0 | 1 | 2 | 3;
+}
 export interface VegetationField {
   readonly instances: readonly VegetationInstance[];
-  readonly diagnostics: { readonly candidates: number; readonly trees: number };
+  readonly groundCover: readonly GroundCoverInstance[];
+  readonly diagnostics: { readonly candidates: number; readonly trees: number; readonly groundCover: number };
 }
 
 function hash(seed: number, x: number, z: number): number {
@@ -19,67 +29,107 @@ function hash(seed: number, x: number, z: number): number {
   return ((value ^ (value >>> 16)) >>> 0) / 4294967296;
 }
 
-/** Deterministic, terrain-aware tree placement. Coordinates and dimensions use world units (1 unit = 1 km). */
+/** Deterministic, terrain- and moisture-aware vegetation placement. 1 world unit = 1 km. */
 export function generateVegetation(
   field: Heightfield,
   seed: number,
   rivers?: RiverNetwork,
 ): VegetationField {
   const instances: VegetationInstance[] = [];
-  const stride = 3;
-  const candidatesX = Math.floor((field.width - 2) / stride);
-  const candidatesZ = Math.floor((field.height - 2) / stride);
-  const maxTrees = 1800;
-
-  for (let gz = 2; gz < field.height - 2; gz += stride) {
-    for (let gx = 2; gx < field.width - 2; gx += stride) {
-      const patchX = Math.floor(gx / 12);
-      const patchZ = Math.floor(gz / 12);
-      const patch = hash(seed + 17, patchX, patchZ);
-      const chance = patch > 0.28 ? 0.78 : 0.07;
-      if (hash(seed, gx, gz) > chance) continue;
-
-      const jitterX = (hash(seed + 31, gx, gz) - 0.5) * stride * 0.8;
-      const jitterZ = (hash(seed + 47, gx, gz) - 0.5) * stride * 0.8;
-      const gridX = Math.max(1, Math.min(field.width - 2, gx + jitterX));
-      const gridZ = Math.max(1, Math.min(field.height - 2, gz + jitterZ));
-      const x = field.bounds.minX + gridX / (field.width - 1) * (field.bounds.maxX - field.bounds.minX);
-      const z = field.bounds.minZ + gridZ / (field.height - 1) * (field.bounds.maxZ - field.bounds.minZ);
-      const centerX=(field.bounds.minX+field.bounds.maxX)*0.5,centerZ=(field.bounds.minZ+field.bounds.maxZ)*0.5;
-      if(Math.hypot(x-centerX,z-centerZ)<0.014) continue;
-      const surface = sampleSurface(field, x, z);
-      const elevation = surface.elevation;
-      if (elevation < 0.035 || elevation > 0.92 || surface.slope > 0.78) continue;
-
-      const ix = Math.round(gridX), iz = Math.round(gridZ);
-      let nearWater = false;
-      if (rivers) {
-        for (let dz = -2; dz <= 2 && !nearWater; dz += 1) {
-          for (let dx = -2; dx <= 2; dx += 1) {
-            const nx = ix + dx, nz = iz + dz;
-            if (nx >= 0 && nx < field.width && nz >= 0 && nz < field.height
-              && rivers.channelMask[nz * field.width + nx] > 0) {
-              nearWater = true;
-              break;
-            }
-          }
-        }
+  const groundCover: GroundCoverInstance[] = [];
+  const waterInfluence = new Uint8Array(field.width * field.height);
+  if (rivers) {
+    for (const index of rivers.channelIndices) {
+      const cx = index % field.width, cz = Math.floor(index / field.width);
+      for (let dz = -4; dz <= 4; dz++) for (let dx = -4; dx <= 4; dx++) {
+        const x = cx + dx, z = cz + dz;
+        if (x >= 0 && x < field.width && z >= 0 && z < field.height
+          && dx * dx + dz * dz <= 16) waterInfluence[z * field.width + x] = 1;
       }
-      // Keep a narrow open riverbank; moisture increases nearby woodland density.
-      if (nearWater && hash(seed + 59, gx, gz) < 0.34) continue;
-      if (hash(seed + 71, gx, gz) > (nearWater ? 0.88 : 0.68)) continue;
-
-      const height = 0.009 + hash(seed + 83, gx, gz) * 0.009;
-      const tint = hash(seed + 97, gx, gz);
-      instances.push({
-        x, y: elevation * 1.18 + 0.0015, z,
-        height: height * (surface.slope > 0.48 ? 0.82 : 1),
-        tint,
-      });
-      if (instances.length >= maxTrees) break;
     }
-    if (instances.length >= maxTrees) break;
   }
 
-  return { instances, diagnostics: { candidates: candidatesX * candidatesZ, trees: instances.length } };
+  const centerX = (field.bounds.minX + field.bounds.maxX) * 0.5;
+  const centerZ = (field.bounds.minZ + field.bounds.maxZ) * 0.5;
+  const spanX = field.bounds.maxX - field.bounds.minX;
+  const spanZ = field.bounds.maxZ - field.bounds.minZ;
+  const toWorld = (gx: number, gz: number) => ({
+    x: field.bounds.minX + gx / (field.width - 1) * spanX,
+    z: field.bounds.minZ + gz / (field.height - 1) * spanZ,
+  });
+
+  // Trees form clustered woodland patches rather than a sparse uniform scatter.
+  for (let gz = 2; gz < field.height - 2; gz += 3) {
+    for (let gx = 2; gx < field.width - 2; gx += 3) {
+      const patch = hash(seed + 17, Math.floor(gx / 10), Math.floor(gz / 10));
+      if (hash(seed, gx, gz) > (patch > 0.24 ? 0.84 : 0.035)) continue;
+      const jitterX = (hash(seed + 31, gx, gz) - 0.5) * 2.2;
+      const jitterZ = (hash(seed + 47, gx, gz) - 0.5) * 2.2;
+      const gridX = Math.max(1, Math.min(field.width - 2, gx + jitterX));
+      const gridZ = Math.max(1, Math.min(field.height - 2, gz + jitterZ));
+      const { x, z } = toWorld(gridX, gridZ);
+      if (Math.hypot(x - centerX, z - centerZ) < 0.014) continue;
+      const surface = sampleSurface(field, x, z);
+      if (surface.elevation < 0.035 || surface.elevation > 0.92 || surface.slope > 0.72) continue;
+      const nearWater = waterInfluence[Math.round(gridZ) * field.width + Math.round(gridX)] > 0;
+      const density = nearWater ? 0.94 : 0.78;
+      if (hash(seed + 71, gx, gz) > density) continue;
+      instances.push({
+        x, y: surface.elevation * 1.18 + 0.0015, z,
+        height: 0.009 + hash(seed + 83, gx, gz) * 0.010,
+        tint: hash(seed + 97, gx, gz),
+      });
+      if (instances.length >= 2600) break;
+    }
+    if (instances.length >= 2600) break;
+  }
+
+  // Ground cover is much denser and follows moisture, slope and exposed rock.
+  for (let gz = 2; gz < field.height - 2; gz += 2) {
+    for (let gx = 2; gx < field.width - 2; gx += 2) {
+      const jitterX = (hash(seed + 131, gx, gz) - 0.5) * 1.45;
+      const jitterZ = (hash(seed + 149, gx, gz) - 0.5) * 1.45;
+      const gridX = Math.max(1, Math.min(field.width - 2, gx + jitterX));
+      const gridZ = Math.max(1, Math.min(field.height - 2, gz + jitterZ));
+      const { x, z } = toWorld(gridX, gridZ);
+      if (Math.hypot(x - centerX, z - centerZ) < 0.014) continue;
+      const surface = sampleSurface(field, x, z);
+      if (surface.elevation < 0.018 || surface.elevation > 0.96 || surface.slope > 1.05) continue;
+      const nearWater = waterInfluence[Math.round(gridZ) * field.width + Math.round(gridX)] > 0;
+      const roll = hash(seed + 167, gx, gz);
+      const patch = hash(seed + 173, Math.floor(gx / 9), Math.floor(gz / 9));
+      if (roll > (patch > 0.18 ? 0.72 : 0.24)) continue;
+
+      let kind: GroundCoverInstance["kind"];
+      if (surface.slope > 0.72 && roll > 0.42) kind = 3; // exposed stones
+      else if (nearWater && roll < 0.34) kind = 2; // damp moss
+      else if (nearWater && roll < 0.62) kind = 1; // ferns in moist shade
+      else if (roll < 0.78) kind = 0; // grass
+      else kind = patch > 0.5 ? 1 : 0;
+
+      const scale = kind === 3
+        ? 0.0022 + hash(seed + 181, gx, gz) * 0.0038
+        : kind === 2
+          ? 0.0020 + hash(seed + 181, gx, gz) * 0.0025
+          : kind === 1
+            ? 0.0035 + hash(seed + 181, gx, gz) * 0.0045
+            : 0.0025 + hash(seed + 181, gx, gz) * 0.0035;
+      groundCover.push({
+        x, y: surface.elevation * 1.18 + 0.0012, z, scale,
+        tint: hash(seed + 193, gx, gz), kind,
+      });
+      if (groundCover.length >= 7200) break;
+    }
+    if (groundCover.length >= 7200) break;
+  }
+
+  return {
+    instances,
+    groundCover,
+    diagnostics: {
+      candidates: Math.floor((field.width - 4) / 2) * Math.floor((field.height - 4) / 2),
+      trees: instances.length,
+      groundCover: groundCover.length,
+    },
+  };
 }
