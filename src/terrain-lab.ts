@@ -24,8 +24,8 @@ function render(refreshHydrology=true):void {
       const rivers=extractRiverNetwork(generated.heightfield,drainage);
       renderer.setHydrology(generated.heightfield,drainage,rivers);
       const vegetation=generateVegetation(generated.heightfield,recipe.seed,rivers);
-      renderer.setVegetation(vegetation.instances);
-      hydrologyMetrics=`<span class="lab-chip">ต้นไม้ ${vegetation.diagnostics.trees.toLocaleString("th-TH")} ต้น</span>`+`<span class="lab-chip">ทางน้ำ ${rivers.diagnostics.channelCellCount.toLocaleString("th-TH")} จุด</span><span class="lab-chip">ต้นน้ำ ${rivers.diagnostics.headwaterCount.toLocaleString("th-TH")}</span><span class="lab-chip">ทางออก ${rivers.diagnostics.outletCount.toLocaleString("th-TH")}</span><span class="lab-chip">สะสมสูงสุด ${drainage.diagnostics.maximumAccumulation.toLocaleString("th-TH")}</span>`;
+      renderer.setVegetation(vegetation.instances);renderer.setGroundCover(vegetation.groundCover);
+      hydrologyMetrics=`<span class="lab-chip">ต้นไม้ ${vegetation.diagnostics.trees.toLocaleString("th-TH")} ต้น</span><span class="lab-chip">พืชพื้น ${vegetation.diagnostics.groundCover.toLocaleString("th-TH")} จุด</span>`+`<span class="lab-chip">ทางน้ำ ${rivers.diagnostics.channelCellCount.toLocaleString("th-TH")} จุด</span><span class="lab-chip">ต้นน้ำ ${rivers.diagnostics.headwaterCount.toLocaleString("th-TH")}</span><span class="lab-chip">ทางออก ${rivers.diagnostics.outletCount.toLocaleString("th-TH")}</span><span class="lab-chip">สะสมสูงสุด ${drainage.diagnostics.maximumAccumulation.toLocaleString("th-TH")}</span>`;
     }
     renderer.resize();
     metrics.innerHTML=`<span class="lab-chip">จุด ${generated.heightfield.values.length.toLocaleString("th-TH")}</span><span class="lab-chip">ต่ำสุด ${d.min.toFixed(3)}</span><span class="lab-chip">สูงสุด ${d.max.toFixed(3)}</span><span class="lab-chip">ความแปรปรวน ${d.variance.toFixed(4)}</span><span class="lab-chip">Slope เฉลี่ย ${d.slopeMean.toFixed(3)}</span>${hydrologyMetrics}`;
