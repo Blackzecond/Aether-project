@@ -3,7 +3,7 @@ import { sampleElevation, type Heightfield } from "../../world/fields/heightfiel
 import type { DrainageField } from "../../world/hydrology/drainage";
 import type { RiverNetwork } from "../../world/hydrology/rivers";
 import type { GroundCoverInstance, VegetationInstance } from "../../world/ecology/vegetation";
-import type { VolumeMesh } from "../../world/volume/density-world";
+import type { VolumeMesh, VolumeMeshChunk } from "../../world/volume/density-world";
 
 export type TerrainViewMode = "world" | "first-person" | "shaded" | "elevation" | "slope" | "normals" | "wireframe" | "hydrology";
 
@@ -326,7 +326,7 @@ export class TerrainPreviewRenderer {
   private maximumAccumulation = 1;
   private vertexCount = 0;
   private surfaceVertexCount = 0;
-  private usesVolumeMesh = false;
+  private usesVolumeMesh = false;\n  private volumeChunks: readonly VolumeMeshChunk[] = [];
   private triangleCount = 0;
   private lineCount = 0;
   private mode: TerrainViewMode = "world";
@@ -567,7 +567,7 @@ export class TerrainPreviewRenderer {
   }
 
   setVolumeTerrain(field: Heightfield,mesh:VolumeMesh):void {
-    this.uploadTerrainMesh(field,mesh,true);
+    this.uploadTerrainMesh(field,mesh,true,mesh.chunks);
   }
 
   private uploadTerrainMesh(
@@ -576,7 +576,7 @@ export class TerrainPreviewRenderer {
     volume:boolean,
   ):void {
     this.field=field;
-    this.usesVolumeMesh=volume;
+    this.usesVolumeMesh=volume;\n    this.volumeChunks=chunks;
     const gl=this.gl;
     this.vertexCount=mesh.vertexCount;
     this.surfaceVertexCount=field.width*field.height;
@@ -753,6 +753,13 @@ export class TerrainPreviewRenderer {
       gl.drawElements(gl.LINES, this.lineCount, gl.UNSIGNED_INT, 0);
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
       gl.enable(gl.CULL_FACE);
+    } else if(exploring&&this.volumeChunks.length>0){
+      const rangeSquared=0.42*0.42;
+      for(const chunk of this.volumeChunks){
+        const dx=chunk.centerX-camera[0],dz=chunk.centerZ-camera[2];
+        if(dx*dx+dz*dz>rangeSquared)continue;
+        gl.drawElements(gl.TRIANGLES,chunk.indexCount,gl.UNSIGNED_INT,chunk.startIndex*Uint32Array.BYTES_PER_ELEMENT);
+      }
     } else {
       gl.drawElements(gl.TRIANGLES, this.triangleCount, gl.UNSIGNED_INT, 0);
     }
