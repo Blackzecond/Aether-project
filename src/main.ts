@@ -29,6 +29,7 @@ const nodeList = requiredElement<HTMLDivElement>("#node-list");
 const graphStatus = requiredElement<HTMLElement>("#graph-status");
 const graphMeta = requiredElement<HTMLElement>("#graph-count");
 const nodeTypeSelect = requiredElement<HTMLSelectElement>("#node-type");
+const graphFileInput = requiredElement<HTMLInputElement>("#graph-file");
 const context = (() => {
   const value = canvas.getContext("2d", { alpha: false, desynchronized: true });
   if (!value) throw new Error("This browser does not provide a 2D canvas context.");
@@ -167,6 +168,7 @@ function renderGraphEditor(): void {
     if (!definition) continue;
     const info = nodeLabels[node.type] ?? { title: node.type, category: "NODE" };
     const card = createElement("article", node.type === "landscape.compose" ? "editor-node output-node" : "editor-node");
+    const nodeIndex = graphState.nodes.findIndex((item) => item.id === node.id);
     card.dataset.nodeId = node.id;
 
     const heading = createElement("div", "editor-node-heading");
@@ -178,14 +180,34 @@ function renderGraphEditor(): void {
     );
     heading.append(identity);
 
+    const actions = createElement("div", "node-actions");
+    if (nodeIndex > 0) {
+      const moveUp = createElement("button", "move-node", "↑");
+      moveUp.type = "button";
+      moveUp.dataset.action = "move-node";
+      moveUp.dataset.nodeId = node.id;
+      moveUp.dataset.direction = "-1";
+      moveUp.setAttribute("aria-label", "เลื่อน Node ขึ้น");
+      actions.append(moveUp);
+    }
+    if (nodeIndex < graphState.nodes.length - 1) {
+      const moveDown = createElement("button", "move-node", "↓");
+      moveDown.type = "button";
+      moveDown.dataset.action = "move-node";
+      moveDown.dataset.nodeId = node.id;
+      moveDown.dataset.direction = "1";
+      moveDown.setAttribute("aria-label", "เลื่อน Node ลง");
+      actions.append(moveDown);
+    }
     if (!DEFAULT_NODE_IDS.has(node.id)) {
       const remove = createElement("button", "remove-node", "ลบ");
       remove.type = "button";
       remove.dataset.action = "remove-node";
       remove.dataset.nodeId = node.id;
       remove.setAttribute("aria-label", "ลบ " + info.title);
-      heading.append(remove);
+      actions.append(remove);
     }
+    if (actions.childElementCount > 0) heading.append(actions);
     card.append(heading);
 
     if (node.type === "number.constant") {
@@ -363,6 +385,18 @@ nodeList.addEventListener("click", (event) => {
     return;
   }
 
+  if (action === "move-node" && nodeId) {
+    const index = graphState.nodes.findIndex((node) => node.id === nodeId);
+    const nextIndex = index + Number(button.dataset.direction);
+    if (index < 0 || nextIndex < 0 || nextIndex >= graphState.nodes.length) return;
+    const nodes = [...graphState.nodes];
+    [nodes[index], nodes[nextIndex]] = [nodes[nextIndex], nodes[index]];
+    graphState = { ...graphState, nodes };
+    saveGraph();
+    scheduleRender();
+    return;
+  }
+
   if (action === "remove-node" && nodeId) {
     graphState = {
       nodes: graphState.nodes.filter((node) => node.id !== nodeId),
@@ -407,6 +441,49 @@ requiredElement<HTMLButtonElement>("#add-node").addEventListener("click", () => 
   saveGraph();
   graphStatus.textContent = "เพิ่ม Node แล้ว เลือกช่อง OUTPUT เพื่อเริ่มเชื่อมต่อ";
   scheduleRender();
+});
+
+requiredElement<HTMLButtonElement>("#export-graph").addEventListener("click", () => {
+  try {
+    const source = serializeGraphDocument(graphState);
+    const blob = new Blob([source], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "aether-graph.json";
+    link.click();
+    URL.revokeObjectURL(url);
+    graphStatus.textContent = "ส่งออก Graph แล้ว";
+  } catch (error) {
+    graphStatus.textContent = error instanceof Error ? error.message : "ส่งออก Graph ไม่สำเร็จ";
+  }
+});
+
+requiredElement<HTMLButtonElement>("#import-graph").addEventListener("click", () => {
+  graphFileInput.click();
+});
+
+graphFileInput.addEventListener("change", async () => {
+  const file = graphFileInput.files?.[0];
+  if (!file) return;
+  try {
+    if (file.size > 1_000_000) throw new Error("ไฟล์ Graph ต้องมีขนาดไม่เกิน 1 MB");
+    const imported = parseGraphDocument(await file.text());
+    if (!imported.nodes.some((node) => node.id === "landscape" && node.type === "landscape.compose")) {
+      throw new Error("ไฟล์นี้ไม่มี Landscape Generator");
+    }
+    evaluateGraph(imported, registry);
+    graphState = imported;
+    selectedOutput = null;
+    syncControlsFromGraph();
+    saveGraph();
+    graphStatus.textContent = "นำเข้า Graph สำเร็จ";
+    scheduleRender();
+  } catch (error) {
+    graphStatus.textContent = error instanceof Error ? error.message : "นำเข้า Graph ไม่สำเร็จ";
+  } finally {
+    graphFileInput.value = "";
+  }
 });
 
 requiredElement<HTMLButtonElement>("#reset-graph").addEventListener("click", () => {
