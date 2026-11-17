@@ -15,7 +15,7 @@ scope.onmessage=(event:MessageEvent<Request>):void=>{
     const response={
       id,ok:true as const,
       heightfield:{width:heightfield.width,height:heightfield.height,bounds:heightfield.bounds,values:heightfield.values.buffer},
-      mesh:{positions:mesh.positions.buffer,normals:mesh.normals.buffer,indices:mesh.indices.buffer,vertexCount:mesh.vertexCount,triangleCount:mesh.triangleCount},
+      mesh:{positions:mesh.positions.buffer,normals:mesh.normals.buffer,indices:mesh.indices.buffer,vertexCount:mesh.vertexCount,triangleCount:mesh.triangleCount,chunks:mesh.chunks},
       diagnostics:world.diagnostics,
     };
     scope.postMessage(response,[heightfield.values.buffer,mesh.positions.buffer,mesh.normals.buffer,mesh.indices.buffer]);
