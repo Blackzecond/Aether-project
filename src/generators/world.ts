@@ -181,6 +181,7 @@ function buildRiver(
   seed: number,
 ): RiverPoint[] {
   if (strength <= 0.01) return [];
+  const maxAccumulation = Math.max(...Array.from(accumulation));
   // The headwater anchor is seed-stable. It sits on one of the three
   // highland spines, so terrain edits reshape its downstream route without
   // making the river jump to an unrelated mountain.
