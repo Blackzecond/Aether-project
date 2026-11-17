@@ -30,6 +30,9 @@ const graphStatus = requiredElement<HTMLElement>("#graph-status");
 const graphMeta = requiredElement<HTMLElement>("#graph-count");
 const nodeTypeSelect = requiredElement<HTMLSelectElement>("#node-type");
 const graphFileInput = requiredElement<HTMLInputElement>("#graph-file");
+const graphSearchInput = requiredElement<HTMLInputElement>("#graph-search");
+const graphCategorySelect = requiredElement<HTMLSelectElement>("#graph-category");
+const graphFilterCount = requiredElement<HTMLElement>("#graph-filter-count");
 const context = (() => {
   const value = canvas.getContext("2d", { alpha: false, desynchronized: true });
   if (!value) throw new Error("This browser does not provide a 2D canvas context.");
@@ -87,6 +90,7 @@ function restoreGraph(): GraphDocument {
 
 let graphState = restoreGraph();
 let selectedOutput: { nodeId: string; port: string } | null = null;
+const collapsedGroups = new Set<string>();
 let nodeCounter = 1;
 let edgeCounter = 1;
 
@@ -189,34 +193,73 @@ function applyGraphView(): void { graphStage.style.transform = "translate(" + vi
 function renderGraphEditor(): void {
   for (const child of Array.from(graphStage.children)) if (child !== wireLayer) child.remove();
   graphMeta.textContent = graphState.nodes.length + " NODES · " + graphState.edges.length + " LINKS";
-  graphState.nodes.forEach((node, index) => {
-    const definition = registry.get(node.type); if (!definition) return;
+  const query = graphSearchInput.value.trim().toLocaleLowerCase();
+  const categoryFilter = graphCategorySelect.value;
+  const visibleNodes = graphState.nodes.filter((node) => {
     const info = nodeLabels[node.type] ?? { title: node.type, category: "NODE" };
-    const card = createElement("article", node.type === "landscape.compose" ? "editor-node output-node" : "editor-node");
-    card.dataset.nodeId = node.id; const pos = nodePosition(node.id, index); card.style.left = pos.x + "px"; card.style.top = pos.y + "px";
-    const heading = createElement("div", "editor-node-heading node-drag-handle");
-    const identity = createElement("div", "editor-node-identity");
-    identity.append(createElement("span", "node-type", info.category), createElement("strong", "editor-node-title", info.title), createElement("span", "node-id", node.id)); heading.append(identity);
-    const actions = createElement("div", "node-actions");
-    if (!DEFAULT_NODE_IDS.has(node.id)) { const remove = createElement("button", "remove-node", "ลบ"); remove.type = "button"; remove.dataset.action = "remove-node"; remove.dataset.nodeId = node.id; actions.append(remove); }
-    if (actions.childElementCount) heading.append(actions); card.append(heading);
-    if (node.type === "number.constant") {
-      const label = createElement("label", "node-param-label", "ค่า"), input = createElement("input", "node-param-input");
-      input.type = "number"; input.step = "any"; input.inputMode = "decimal"; input.value = String(typeof node.params?.value === "number" ? node.params.value : 0);
-      if (node.id === "scale") { input.min = "0.5"; input.max = "2.4"; input.step = "0.1"; }
-      if (node.id === "roughness") { input.min = "0.15"; input.max = "0.85"; input.step = "0.05"; }
-      if (node.id === "detail") { input.min = "1"; input.max = "6"; input.step = "1"; }
-      input.dataset.nodeId = node.id; input.dataset.param = "value"; label.append(input); card.append(label);
-    }
-    const ports = createElement("div", "node-ports"), ins = createElement("div", "port-group"), outs = createElement("div", "port-group output-group");
-    ins.append(createElement("span", "port-heading", "INPUT")); outs.append(createElement("span", "port-heading", "OUTPUT"));
-    if (!definition.inputs.length) ins.append(createElement("span", "port-empty", "ไม่มีช่องรับ"));
-    for (const port of definition.inputs) { const edge = graphState.edges.find(e => e.toNodeId === node.id && e.toPort === port); const from = edge ? graphState.nodes.find(n => n.id === edge.fromNodeId)?.id : null;
-      const btn = createElement("button", "port-button input-port", edge ? "← " + port + " · " + (from ?? "connected") : "← " + port); btn.type = "button"; btn.dataset.action = "connect-input"; btn.dataset.nodeId = node.id; btn.dataset.port = port; btn.dataset.kind = "in"; ins.append(btn); }
-    if (!definition.outputs.length) outs.append(createElement("span", "port-empty", "ไม่มีช่องส่ง"));
-    for (const port of definition.outputs) { const btn = createElement("button", "port-button output-port", port + " →"); btn.type = "button"; btn.dataset.action = "select-output"; btn.dataset.nodeId = node.id; btn.dataset.port = port; btn.dataset.kind = "out"; if (selectedOutput?.nodeId === node.id && selectedOutput.port === port) btn.classList.add("is-selected"); outs.append(btn); }
-    ports.append(ins, outs); card.append(ports); graphStage.append(card);
-  }); applyGraphView();
+    const matchesCategory = categoryFilter === "all" || info.category === categoryFilter;
+    const haystack = [node.id, node.type, info.title, info.category].join(" ").toLocaleLowerCase();
+    return matchesCategory && (!query || haystack.includes(query));
+  });
+  graphFilterCount.textContent = query || categoryFilter !== "all"
+    ? "แสดง " + visibleNodes.length + " จาก " + graphState.nodes.length + " Node"
+    : "จัดกลุ่มอัตโนมัติตามประเภท Node";
+  const groups = new Map<string, GraphNode[]>();
+  for (const node of visibleNodes) {
+    const category = (nodeLabels[node.type] ?? { category: "NODE" }).category;
+    const items = groups.get(category) ?? [];
+    items.push(node);
+    groups.set(category, items);
+  }
+  const categoryOrder = ["NUMBER", "MATH", "OUTPUT", "NODE"];
+  const orderedGroups = [...groups.entries()].sort((a, b) => categoryOrder.indexOf(a[0]) - categoryOrder.indexOf(b[0]));
+  for (const [category, nodes] of orderedGroups) {
+    const positions = nodes.map((node) => nodePosition(node.id, graphState.nodes.findIndex((item) => item.id === node.id)));
+    const groupX = Math.max(12, Math.min(...positions.map((pos) => pos.x)));
+    const groupY = Math.max(8, Math.min(...positions.map((pos) => pos.y)) - 39);
+    const collapsed = collapsedGroups.has(category);
+    const groupButton = createElement("button", "graph-group-toggle" + (collapsed ? " is-collapsed" : ""), "");
+    groupButton.type = "button";
+    groupButton.dataset.action = "toggle-group";
+    groupButton.dataset.category = category;
+    groupButton.style.left = groupX + "px";
+    groupButton.style.top = groupY + "px";
+    const groupName: Record<string, string> = { NUMBER: "ตัวเลข", MATH: "คณิตศาสตร์", OUTPUT: "ผลลัพธ์", NODE: "อื่น ๆ" };
+    groupButton.textContent = (collapsed ? "＋ " : "− ") + (groupName[category] ?? category) + " · " + nodes.length;
+    groupButton.setAttribute("aria-expanded", String(!collapsed));
+    groupButton.setAttribute("aria-label", (collapsed ? "ขยายกลุ่ม " : "พับกลุ่ม ") + (groupName[category] ?? category));
+    graphStage.append(groupButton);
+    if (collapsed) continue;
+    nodes.forEach((node) => {
+      const definition = registry.get(node.type); if (!definition) return;
+      const info = nodeLabels[node.type] ?? { title: node.type, category: "NODE" };
+      const card = createElement("article", node.type === "landscape.compose" ? "editor-node output-node" : "editor-node");
+      card.dataset.nodeId = node.id; const pos = nodePosition(node.id, graphState.nodes.findIndex((item) => item.id === node.id)); card.style.left = pos.x + "px"; card.style.top = pos.y + "px";
+      const heading = createElement("div", "editor-node-heading node-drag-handle");
+      const identity = createElement("div", "editor-node-identity");
+      identity.append(createElement("span", "node-type", info.category), createElement("strong", "editor-node-title", info.title), createElement("span", "node-id", node.id)); heading.append(identity);
+      const actions = createElement("div", "node-actions");
+      if (!DEFAULT_NODE_IDS.has(node.id)) { const remove = createElement("button", "remove-node", "ลบ"); remove.type = "button"; remove.dataset.action = "remove-node"; remove.dataset.nodeId = node.id; actions.append(remove); }
+      if (actions.childElementCount) heading.append(actions); card.append(heading);
+      if (node.type === "number.constant") {
+        const label = createElement("label", "node-param-label", "ค่า"), input = createElement("input", "node-param-input");
+        input.type = "number"; input.step = "any"; input.inputMode = "decimal"; input.value = String(typeof node.params?.value === "number" ? node.params.value : 0);
+        if (node.id === "scale") { input.min = "0.5"; input.max = "2.4"; input.step = "0.1"; }
+        if (node.id === "roughness") { input.min = "0.15"; input.max = "0.85"; input.step = "0.05"; }
+        if (node.id === "detail") { input.min = "1"; input.max = "6"; input.step = "1"; }
+        input.dataset.nodeId = node.id; input.dataset.param = "value"; label.append(input); card.append(label);
+      }
+      const ports = createElement("div", "node-ports"), ins = createElement("div", "port-group"), outs = createElement("div", "port-group output-group");
+      ins.append(createElement("span", "port-heading", "INPUT")); outs.append(createElement("span", "port-heading", "OUTPUT"));
+      if (!definition.inputs.length) ins.append(createElement("span", "port-empty", "ไม่มีช่องรับ"));
+      for (const port of definition.inputs) { const edge = graphState.edges.find((item) => item.toNodeId === node.id && item.toPort === port); const from = edge ? graphState.nodes.find((item) => item.id === edge.fromNodeId)?.id : null;
+        const btn = createElement("button", "port-button input-port", edge ? "← " + port + " · " + (from ?? "connected") : "← " + port); btn.type = "button"; btn.dataset.action = "connect-input"; btn.dataset.nodeId = node.id; btn.dataset.port = port; btn.dataset.kind = "in"; ins.append(btn); }
+      if (!definition.outputs.length) outs.append(createElement("span", "port-empty", "ไม่มีช่องส่ง"));
+      for (const port of definition.outputs) { const btn = createElement("button", "port-button output-port", port + " →"); btn.type = "button"; btn.dataset.action = "select-output"; btn.dataset.nodeId = node.id; btn.dataset.port = port; btn.dataset.kind = "out"; if (selectedOutput?.nodeId === node.id && selectedOutput.port === port) btn.classList.add("is-selected"); outs.append(btn); }
+      ports.append(ins, outs); card.append(ports); graphStage.append(card);
+    });
+  }
+  applyGraphView();
 }
 function updateOutputs(): void {
   const options = readOptions();
@@ -281,6 +324,14 @@ graphStage.addEventListener("click", (event) => {
   if (!button) return;
   const action = button.dataset.action;
   const nodeId = button.dataset.nodeId;
+  const category = button.dataset.category;
+
+  if (action === "toggle-group" && category) {
+    if (collapsedGroups.has(category)) collapsedGroups.delete(category);
+    else collapsedGroups.add(category);
+    renderGraphEditor();
+    return;
+  }
   const port = button.dataset.port;
 
   if (action === "select-output" && nodeId && port) {
