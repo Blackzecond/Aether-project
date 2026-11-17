@@ -28,6 +28,7 @@ for(const [id,key] of controls){
     recipe={...recipe,landform:{...recipe.landform,[key]:value}};render();
   });
 }
+document.querySelector<HTMLButtonElement>("#reset-camera")!.addEventListener("click",()=>renderer.resetCamera());
 document.querySelector<HTMLSelectElement>("#debug-mode")!.addEventListener("change",event=>{
   renderer.setMode((event.currentTarget as HTMLSelectElement).value as TerrainViewMode);renderer.render();
 });
