@@ -195,6 +195,9 @@ function renderGraphEditor(): void {
       valueInput.step = "any";
       valueInput.inputMode = "decimal";
       valueInput.value = String(typeof node.params?.value === "number" ? node.params.value : 0);
+      if (node.id === "scale") { valueInput.min = "0.5"; valueInput.max = "2.4"; valueInput.step = "0.1"; }
+      if (node.id === "roughness") { valueInput.min = "0.15"; valueInput.max = "0.85"; valueInput.step = "0.05"; }
+      if (node.id === "detail") { valueInput.min = "1"; valueInput.max = "6"; valueInput.step = "1"; }
       valueInput.dataset.nodeId = node.id;
       valueInput.dataset.param = "value";
       valueLabel.append(valueInput);
@@ -208,7 +211,9 @@ function renderGraphEditor(): void {
       inputGroup.append(createElement("span", "port-empty", "ไม่มีช่องรับ"));
     } else {
       for (const port of definition.inputs) {
-        const button = createElement("button", "port-button input-port", "← " + port);
+        const connection = graphState.edges.find((edge) => edge.toNodeId === node.id && edge.toPort === port);
+        const sourceName = connection ? graphState.nodes.find((item) => item.id === connection.fromNodeId)?.id : null;
+        const button = createElement("button", "port-button input-port", connection ? `← ${port} · ${sourceName ?? "connected"}` : "← " + port);
         button.type = "button";
         button.dataset.action = "connect-input";
         button.dataset.nodeId = node.id;
@@ -318,7 +323,15 @@ nodeList.addEventListener("click", (event) => {
 
   if (action === "connect-input" && nodeId && port) {
     if (!selectedOutput) {
-      graphStatus.textContent = "แตะช่อง OUTPUT ก่อน แล้วจึงเลือก INPUT";
+      const existing = graphState.edges.find((item) => item.toNodeId === nodeId && item.toPort === port);
+      if (existing) {
+        graphState = { ...graphState, edges: graphState.edges.filter((item) => item.id !== existing.id) };
+        saveGraph();
+        graphStatus.textContent = "ยกเลิกการเชื่อมต่อแล้ว";
+        scheduleRender();
+      } else {
+        graphStatus.textContent = "แตะช่อง OUTPUT ก่อน แล้วจึงเลือก INPUT";
+      }
       return;
     }
     if (selectedOutput.nodeId === nodeId) {
@@ -365,10 +378,15 @@ nodeList.addEventListener("click", (event) => {
 nodeList.addEventListener("change", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLInputElement) || target.dataset.param !== "value") return;
-  const value = Number(target.value);
+  let value = Number(target.value);
   if (!Number.isFinite(value)) return;
   const nodeId = target.dataset.nodeId;
   if (!nodeId) return;
+  if (target.min !== "" && target.max !== "") {
+    value = Math.min(Number(target.max), Math.max(Number(target.min), value));
+  }
+  if (nodeId === "detail") value = Math.round(value);
+  target.value = String(value);
   setNodeParam(nodeId, "value", value);
   if (nodeId === "scale") scaleInput.value = String(value);
   if (nodeId === "roughness") roughnessInput.value = String(value);
