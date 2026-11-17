@@ -181,13 +181,18 @@ export class TerrainPreviewRenderer {
   private readonly indexBuffer: WebGLBuffer;
   private readonly lineBuffer: WebGLBuffer;
   private readonly accumulationBuffer: WebGLBuffer;
-  private readonly channelBuffer: WebGLBuffer;\n  private readonly waterProgram: WebGLProgram;\n  private readonly waterVao: WebGLVertexArrayObject;\n  private readonly waterBuffer: WebGLBuffer;\n  private readonly waterMvpLocation: WebGLUniformLocation;\n  private waterVertexCount = 0;
+  private readonly channelBuffer: WebGLBuffer;
+  private readonly waterProgram: WebGLProgram;
+  private readonly waterVao: WebGLVertexArrayObject;
+  private readonly waterBuffer: WebGLBuffer;
+  private readonly waterMvpLocation: WebGLUniformLocation;
+  private waterVertexCount = 0;
   private maximumAccumulation = 1;
   private vertexCount = 0;
   private surfaceVertexCount = 0;
   private triangleCount = 0;
   private lineCount = 0;
-  private mode: TerrainViewMode = "shaded";
+  private mode: TerrainViewMode = "world";
   private azimuth = 0.76;
   private elevation = 0.58;
   private distance = 4.35;
@@ -206,7 +211,19 @@ export class TerrainPreviewRenderer {
     const gl = canvas.getContext("webgl2", { antialias: true, alpha: false, powerPreference: "low-power" });
     if (!gl) throw new Error("อุปกรณ์หรือเบราว์เซอร์นี้ไม่รองรับ WebGL2");
     this.gl = gl;
-    this.program = createProgram(gl);\n    const waterVs=compile(gl,gl.VERTEX_SHADER,waterVertexSource);\n    const waterFs=compile(gl,gl.FRAGMENT_SHADER,waterFragmentSource);\n    const waterProgram=gl.createProgram();\n    if(!waterProgram) throw new Error("ไม่สามารถสร้าง Water Program ได้");\n    gl.attachShader(waterProgram,waterVs);gl.attachShader(waterProgram,waterFs);gl.linkProgram(waterProgram);gl.deleteShader(waterVs);gl.deleteShader(waterFs);\n    if(!gl.getProgramParameter(waterProgram,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(waterProgram)??"Water program link failed");\n    this.waterProgram=waterProgram;\n    const waterVao=gl.createVertexArray(),waterBuffer=gl.createBuffer();\n    if(!waterVao||!waterBuffer) throw new Error("ไม่สามารถจองหน่วยความจำผิวน้ำได้");\n    this.waterVao=waterVao;this.waterBuffer=waterBuffer;\n    this.waterMvpLocation=gl.getUniformLocation(waterProgram,"uMvp")!;\n    gl.bindVertexArray(waterVao);gl.bindBuffer(gl.ARRAY_BUFFER,waterBuffer);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);gl.bindVertexArray(null);
+    this.program = createProgram(gl);
+    const waterVs=compile(gl,gl.VERTEX_SHADER,waterVertexSource);
+    const waterFs=compile(gl,gl.FRAGMENT_SHADER,waterFragmentSource);
+    const waterProgram=gl.createProgram();
+    if(!waterProgram) throw new Error("ไม่สามารถสร้าง Water Program ได้");
+    gl.attachShader(waterProgram,waterVs);gl.attachShader(waterProgram,waterFs);gl.linkProgram(waterProgram);gl.deleteShader(waterVs);gl.deleteShader(waterFs);
+    if(!gl.getProgramParameter(waterProgram,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(waterProgram)??"Water program link failed");
+    this.waterProgram=waterProgram;
+    const waterVao=gl.createVertexArray(),waterBuffer=gl.createBuffer();
+    if(!waterVao||!waterBuffer) throw new Error("ไม่สามารถจองหน่วยความจำผิวน้ำได้");
+    this.waterVao=waterVao;this.waterBuffer=waterBuffer;
+    this.waterMvpLocation=gl.getUniformLocation(waterProgram,"uMvp")!;
+    gl.bindVertexArray(waterVao);gl.bindBuffer(gl.ARRAY_BUFFER,waterBuffer);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);gl.bindVertexArray(null);
 
     const vao = gl.createVertexArray();
     const position = gl.createBuffer();
@@ -297,8 +314,8 @@ export class TerrainPreviewRenderer {
 
   resetCamera(): void {
     this.azimuth = 0.76;
-    this.elevation = 0.58;
-    this.distance = this.fitDistance;
+    this.elevation = 0.42;
+    this.distance = this.fitDistance * 0.82;
     this.render();
   }
 
@@ -379,8 +396,24 @@ export class TerrainPreviewRenderer {
       accumulation[i] = drainage.accumulation[i];
       channels[i] = rivers.channelMask[i];
     }
-    this.maximumAccumulation = Math.max(1, drainage.diagnostics.maximumAccumulation);\n    const water:number[]=[];\n    const px=(index:number)=>field.bounds.minX+(index%field.width)/(field.width-1)*(field.bounds.maxX-field.bounds.minX);\n    const pz=(index:number)=>field.bounds.minZ+Math.floor(index/field.width)/(field.height-1)*(field.bounds.maxZ-field.bounds.minZ);\n    const py=(index:number)=>field.values[index]*1.18+0.014;\n    for(const index of rivers.channelIndices){\n      const next=rivers.downstream[index];if(next<0)continue;\n      const ax=px(index),az=pz(index),bx=px(next),bz=pz(next);\n      const dx=bx-ax,dz=bz-az,len=Math.hypot(dx,dz)||1;\n      const nx=-dz/len,nz=dx/len;\n      const wa=Math.max(rivers.width[index]*0.5,0.0015),wb=Math.max(rivers.width[next]*0.5,0.0015);\n      const aL=[ax+nx*wa,py(index),az+nz*wa],aR=[ax-nx*wa,py(index),az-nz*wa];\n      const bL=[bx+nx*wb,py(next),bz+nz*wb],bR=[bx-nx*wb,py(next),bz-nz*wb];\n      water.push(...aL,...aR,...bL,...aR,...bR,...bL);\n    }\n    this.waterVertexCount=water.length/3;\n    gl.bindBuffer(gl.ARRAY_BUFFER,this.waterBuffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(water),gl.DYNAMIC_DRAW);
+    this.maximumAccumulation = Math.max(1, drainage.diagnostics.maximumAccumulation);
     const gl = this.gl;
+    const water:number[]=[];
+    const px=(index:number)=>field.bounds.minX+(index%field.width)/(field.width-1)*(field.bounds.maxX-field.bounds.minX);
+    const pz=(index:number)=>field.bounds.minZ+Math.floor(index/field.width)/(field.height-1)*(field.bounds.maxZ-field.bounds.minZ);
+    const py=(index:number)=>field.values[index]*1.18+0.014;
+    for(const index of rivers.channelIndices){
+      const next=rivers.downstream[index];if(next<0)continue;
+      const ax=px(index),az=pz(index),bx=px(next),bz=pz(next);
+      const dx=bx-ax,dz=bz-az,len=Math.hypot(dx,dz)||1;
+      const nx=-dz/len,nz=dx/len;
+      const wa=Math.max(rivers.width[index]*0.5,0.0015),wb=Math.max(rivers.width[next]*0.5,0.0015);
+      const aL=[ax+nx*wa,py(index),az+nz*wa],aR=[ax-nx*wa,py(index),az-nz*wa];
+      const bL=[bx+nx*wb,py(next),bz+nz*wb],bR=[bx-nx*wb,py(next),bz-nz*wb];
+      water.push(...aL,...aR,...bL,...aR,...bR,...bL);
+    }
+    this.waterVertexCount=water.length/3;
+    gl.bindBuffer(gl.ARRAY_BUFFER,this.waterBuffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(water),gl.DYNAMIC_DRAW);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.accumulationBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, accumulation, gl.DYNAMIC_DRAW);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.channelBuffer);
@@ -448,6 +481,10 @@ export class TerrainPreviewRenderer {
       gl.drawElements(gl.TRIANGLES, this.triangleCount, gl.UNSIGNED_INT, 0);
     }
     gl.bindVertexArray(null);
+    if(this.mode==="world" && this.waterVertexCount>0){
+      gl.useProgram(this.waterProgram);gl.uniformMatrix4fv(this.waterMvpLocation,false,mvp);gl.bindVertexArray(this.waterVao);
+      gl.disable(gl.CULL_FACE);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.drawArrays(gl.TRIANGLES,0,this.waterVertexCount);gl.disable(gl.BLEND);gl.enable(gl.CULL_FACE);gl.bindVertexArray(null);
+    }
   }
 
   dispose(): void {
@@ -459,6 +496,7 @@ export class TerrainPreviewRenderer {
     gl.deleteBuffer(this.accumulationBuffer);
     gl.deleteBuffer(this.channelBuffer);
     gl.deleteVertexArray(this.vao);
-    gl.deleteProgram(this.program);\n    gl.deleteBuffer(this.waterBuffer);gl.deleteVertexArray(this.waterVao);gl.deleteProgram(this.waterProgram);
+    gl.deleteProgram(this.program);
+    gl.deleteBuffer(this.waterBuffer);gl.deleteVertexArray(this.waterVao);gl.deleteProgram(this.waterProgram);
   }
 }
