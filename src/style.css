@@ -139,3 +139,32 @@ input[type="range"] { display: block; width: 100%; height: 28px; margin: 0; acce
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
+
+/* Beginner-friendly landscape controls */
+.preset-heading { display: grid; gap: 4px; margin: 4px 0 10px; }
+.preset-heading strong { color: #e0ebe1; font-size: 12px; font-weight: 650; }
+.preset-heading span { color: #91a498; font-size: 10px; }
+.landscape-presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 18px; }
+.landscape-preset { display: grid; min-width: 0; gap: 5px; padding: 7px; border: 1px solid var(--line); border-radius: 10px; background: #1a2923; color: #dce8dd; text-align: left; }
+.landscape-preset.is-active { border-color: #b9d6bd; background: #263a2e; box-shadow: inset 0 0 0 1px rgba(185,214,189,.2); }
+.landscape-preset strong { font-size: 10px; line-height: 1.3; }
+.landscape-preset small { min-height: 25px; color: #91a498; font-size: 8px; line-height: 1.4; }
+.preset-art { display: block; height: 38px; overflow: hidden; border-radius: 6px; background: linear-gradient(160deg, #789a8e 0%, #385c53 70%); position: relative; }
+.preset-art::before, .preset-art::after { content: ''; position: absolute; left: -8%; width: 116%; height: 30px; border-radius: 50% 50% 0 0 / 80% 80% 0 0; }
+.preset-art::before { top: 15px; background: #537c6c; transform: rotate(-7deg); }
+.preset-art::after { top: 23px; background: #29483f; transform: rotate(6deg); }
+.preset-art-rugged { background: linear-gradient(160deg, #8c9c91, #3b5a52); }
+.preset-art-rugged::before { top: 9px; height: 36px; border-radius: 0; clip-path: polygon(0 100%, 20% 10%, 32% 55%, 53% 0, 73% 58%, 88% 15%, 100% 100%); background: #5c786a; transform: none; }
+.preset-art-rugged::after { top: 25px; background: #29483f; }
+.preset-art-detailed { background: linear-gradient(160deg, #91a9a0, #496d64); }
+.preset-art-detailed::before { top: 10px; height: 34px; background: #668779; transform: rotate(-4deg); }
+.preset-art-detailed::after { top: 18px; height: 32px; background: #29483f; transform: rotate(5deg); }
+.friendly-control { margin-top: 15px; }
+.friendly-control .field-label { margin: 0 0 5px; }
+.friendly-control p { margin: 0 0 6px; color: #91a498; font-size: 10px; line-height: 1.5; }
+.friendly-control input[type=range] { margin: 0; }
+.advanced-seed { margin-top: 15px; padding: 10px 11px; border: 1px solid var(--line); border-radius: 9px; background: #17231f; }
+.advanced-seed summary { color: #b5c5b8; font-size: 10px; cursor: pointer; }
+.advanced-seed .field-label { margin-top: 12px; }
+.advanced-seed p { margin: 7px 0 0; color: #879b8d; font-size: 9px; }
+@media (max-width: 360px) { .landscape-presets { gap: 5px; } .landscape-preset { padding: 5px; } .landscape-preset strong { font-size: 9px; } }
