@@ -633,6 +633,7 @@ function fitGraphToView(): void {
   applyGraphView();
 }
 requiredElement<HTMLButtonElement>("#graph-fit").addEventListener("click", fitGraphToView);
+requiredElement<HTMLDetailsElement>("#graph-panel").addEventListener("toggle", (event) => { if ((event.currentTarget as HTMLDetailsElement).open) requestAnimationFrame(fitGraphToView); });
 requiredElement<HTMLButtonElement>("#graph-zoom-reset").addEventListener("click", () => { viewX=0; viewY=0; viewScale=0.6; applyGraphView(); });
 renderGraphEditor();
 const observer = new ResizeObserver(() => { scheduleRender(); drawGraphWires(); });
