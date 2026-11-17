@@ -19,13 +19,13 @@ describe("world foundation v2", () => {
   });
   it("separates macro spacing, relief, sharpness and roughness controls", () => {
     const base = generateTerrain(recipe());
-    const relief = generateTerrain(recipe({ relief: 1.15 }));
-    const rough = generateTerrain(recipe({ roughness: 0.48 }));
-    const sharp = generateTerrain(recipe({ peakSharpness: 0.95 }));
+    const relief = generateTerrain(recipe({ relief: 0.95 }));
+    const rough = generateTerrain(recipe({ roughness: 0.24 }));
+    const sharp = generateTerrain(recipe({ peakSharpness: 0.68 }));
     const spaced = generateTerrain(recipe({ mountainSpacing: 1.45 }));
     const irregular = generateTerrain(recipe({ ridgeIrregularity: 0.9 }));
-    const fineDetail = generateTerrain(recipe({ detailScale: 10.5 }));
-    const moreOctaves = generateTerrain(recipe({ detailOctaves: 6 }));
+    const fineDetail = generateTerrain(recipe({ detailScale: 4.8 }));
+    const moreOctaves = generateTerrain(recipe({ detailOctaves: 4 }));
     expect(relief.diagnostics.mean).not.toBeCloseTo(base.diagnostics.mean, 3);
     expect(rough.diagnostics.variance).not.toBeCloseTo(base.diagnostics.variance, 5);
     expect(sharp.heightfield.values).not.toEqual(base.heightfield.values);
@@ -33,6 +33,18 @@ describe("world foundation v2", () => {
     expect(irregular.heightfield.values).not.toEqual(base.heightfield.values);
     expect(fineDetail.heightfield.values).not.toEqual(base.heightfield.values);
     expect(moreOctaves.heightfield.values).not.toEqual(base.heightfield.values);
+  });
+  it("tapers the terrain perimeter into the surrounding low plain", () => {
+    const field = generateTerrain(recipe()).heightfield;
+    for (let x = 0; x < field.width; x += 1) {
+      expect(field.values[x]).toBeCloseTo(0.01, 5);
+      expect(field.values[(field.height - 1) * field.width + x]).toBeCloseTo(0.01, 5);
+    }
+    for (let z = 0; z < field.height; z += 1) {
+      expect(field.values[z * field.width]).toBeCloseTo(0.01, 5);
+      expect(field.values[z * field.width + field.width - 1]).toBeCloseTo(0.01, 5);
+    }
+    expect(field.values[Math.floor(field.height / 2) * field.width + Math.floor(field.width / 2)]).toBeGreaterThan(0.1);
   });
   it("samples surface normal, slope and curvature", () => {
     const field = generateTerrain(recipe()).heightfield;
@@ -45,8 +57,8 @@ describe("world foundation v2", () => {
     const field = generateTerrain(recipe()).heightfield;
     const mesh = buildHeightfieldMesh(field);
     const perimeterVertices = 2 * (field.width + field.height) - 4;
-    const expectedVertices = field.width * field.height + perimeterVertices * 2 + 1;
-    const expectedTriangles = (field.width - 1) * (field.height - 1) * 2 + perimeterVertices * 3;
+    const expectedVertices = field.width * field.height + perimeterVertices * 2 + 1 + 4;
+    const expectedTriangles = (field.width - 1) * (field.height - 1) * 2 + perimeterVertices * 3 + 2;
     expect(mesh.vertexCount).toBe(expectedVertices);
     expect(mesh.triangleCount).toBe(expectedTriangles);
     expect(mesh.indices.length).toBe(expectedTriangles * 3);
