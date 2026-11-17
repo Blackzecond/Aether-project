@@ -16,7 +16,7 @@ export interface TerrainRecipe {
   };
 }
 export const DEFAULT_TERRAIN_RECIPE: TerrainRecipe = Object.freeze({
-  version: 1, seed: 18273, width: 160, height: 160,
+  version: 1, seed: 18273, width: 256, height: 256,
   landform: {
     mountainSpacing: 1.0, relief: 0.8, peakSharpness: 0.38,
     ridgeIrregularity: 0.32, roughness: 0.1, detailScale: 3.2, detailOctaves: 3,
