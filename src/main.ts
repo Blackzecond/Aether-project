@@ -195,6 +195,7 @@ function renderGraphEditor(): void {
   graphMeta.textContent = graphState.nodes.length + " NODES · " + graphState.edges.length + " LINKS";
   const query = graphSearchInput.value.trim().toLocaleLowerCase();
   const categoryFilter = graphCategorySelect.value;
+  const evaluatedNodes = evaluateGraph(graphState, registry).values;
   const visibleNodes = graphState.nodes.filter((node) => {
     const info = nodeLabels[node.type] ?? { title: node.type, category: "NODE" };
     const matchesCategory = categoryFilter === "all" || info.category === categoryFilter;
@@ -256,7 +257,17 @@ function renderGraphEditor(): void {
         const btn = createElement("button", "port-button input-port", edge ? "← " + port + " · " + (from ?? "connected") : "← " + port); btn.type = "button"; btn.dataset.action = "connect-input"; btn.dataset.nodeId = node.id; btn.dataset.port = port; btn.dataset.kind = "in"; ins.append(btn); }
       if (!definition.outputs.length) outs.append(createElement("span", "port-empty", "ไม่มีช่องส่ง"));
       for (const port of definition.outputs) { const btn = createElement("button", "port-button output-port", port + " →"); btn.type = "button"; btn.dataset.action = "select-output"; btn.dataset.nodeId = node.id; btn.dataset.port = port; btn.dataset.kind = "out"; if (selectedOutput?.nodeId === node.id && selectedOutput.port === port) btn.classList.add("is-selected"); outs.append(btn); }
-      ports.append(ins, outs); card.append(ports); graphStage.append(card);
+      ports.append(ins, outs); card.append(ports);
+      const resultPanel = createElement("div", "node-result");
+      resultPanel.append(createElement("span", "node-result-label", "ค่าที่ส่งออก"));
+      const resultValues = createElement("div", "node-result-values");
+      const nodeValues = evaluatedNodes.get(node.id);
+      for (const output of definition.outputs) {
+        const value = nodeValues?.[output];
+        const display = typeof value === "number" ? Number(value.toPrecision(4)).toString() : String(value ?? "—");
+        resultValues.append(createElement("span", "node-result-chip", output + ": " + display));
+      }
+      resultPanel.append(resultValues); card.append(resultPanel); graphStage.append(card);
     });
   }
   applyGraphView();
@@ -283,6 +294,17 @@ function render(): void {
   renderStatus.textContent = "สร้างแล้ว";
   seedLabel.textContent = `SEED ${options.seed}`;
   resolutionLabel.textContent = `${size.width} × ${size.height} PX`;
+}
+
+let previewRenderQueued = false;
+function schedulePreviewRender(): void {
+  if (previewRenderQueued) return;
+  previewRenderQueued = true;
+  requestAnimationFrame(() => {
+    previewRenderQueued = false;
+    try { updateOutputs(); render(); }
+    catch (error) { renderStatus.textContent = "เกิดข้อผิดพลาด"; graphStatus.textContent = error instanceof Error ? error.message : "Graph ทำงานไม่สำเร็จ"; console.error(error); }
+  });
 }
 
 let renderQueued = false;
@@ -410,16 +432,26 @@ graphStage.addEventListener("click", (event) => {
   }
 });
 
+graphStage.addEventListener("input", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement) || target.dataset.param !== "value" || target.value.trim() === "") return;
+  const value = Number(target.value), nodeId = target.dataset.nodeId;
+  if (!Number.isFinite(value) || !nodeId) return;
+  setNodeParam(nodeId, "value", value);
+  if (nodeId === "scale") scaleInput.value = String(value);
+  if (nodeId === "roughness") roughnessInput.value = String(value);
+  if (nodeId === "detail") detailInput.value = String(value);
+  schedulePreviewRender();
+});
+
 graphStage.addEventListener("change", (event) => {
   const target = event.target;
-  if (!(target instanceof HTMLInputElement) || target.dataset.param !== "value") return;
-  let value = Number(target.value);
-  if (!Number.isFinite(value)) return;
+  if (!(target instanceof HTMLInputElement) || target.dataset.param !== "value" || target.value.trim() === "") return;
   const nodeId = target.dataset.nodeId;
   if (!nodeId) return;
-  if (target.min !== "" && target.max !== "") {
-    value = Math.min(Number(target.max), Math.max(Number(target.min), value));
-  }
+  let value = Number(target.value);
+  if (!Number.isFinite(value)) return;
+  if (target.min !== "" && target.max !== "") value = Math.min(Number(target.max), Math.max(Number(target.min), value));
   if (nodeId === "detail") value = Math.round(value);
   target.value = String(value);
   setNodeParam(nodeId, "value", value);
@@ -427,9 +459,8 @@ graphStage.addEventListener("change", (event) => {
   if (nodeId === "roughness") roughnessInput.value = String(value);
   if (nodeId === "detail") detailInput.value = String(value);
   saveGraph();
-  scheduleRender();
+  schedulePreviewRender();
 });
-
 graphSearchInput.addEventListener("input", renderGraphEditor);
 graphCategorySelect.addEventListener("change", renderGraphEditor);
 
@@ -575,6 +606,19 @@ graphViewport.addEventListener("wheel", (event) => { event.preventDefault(); con
   viewX = px - (px-viewX)*ratio; viewY = py - (py-viewY)*ratio; viewScale = next; applyGraphView(); }, { passive: false });
 requiredElement<HTMLButtonElement>("#graph-zoom-in").addEventListener("click", () => { viewScale = Math.min(1.5, viewScale*1.15); applyGraphView(); });
 requiredElement<HTMLButtonElement>("#graph-zoom-out").addEventListener("click", () => { viewScale = Math.max(0.35, viewScale/1.15); applyGraphView(); });
+function fitGraphToView(): void {
+  if (!graphState.nodes.length) return;
+  const points = graphState.nodes.map((node, index) => nodePosition(node.id, index));
+  const minX = Math.min(...points.map(point => point.x)), minY = Math.min(...points.map(point => point.y));
+  const maxX = Math.max(...points.map(point => point.x + 250)), maxY = Math.max(...points.map(point => point.y + 210));
+  const width = Math.max(1, maxX - minX), height = Math.max(1, maxY - minY);
+  const availableWidth = Math.max(1, graphViewport.clientWidth - 32), availableHeight = Math.max(1, graphViewport.clientHeight - 32);
+  viewScale = Math.max(0.3, Math.min(1.1, availableWidth / width, availableHeight / height));
+  viewX = (graphViewport.clientWidth - width * viewScale) / 2 - minX * viewScale;
+  viewY = (graphViewport.clientHeight - height * viewScale) / 2 - minY * viewScale;
+  applyGraphView();
+}
+requiredElement<HTMLButtonElement>("#graph-fit").addEventListener("click", fitGraphToView);
 requiredElement<HTMLButtonElement>("#graph-zoom-reset").addEventListener("click", () => { viewX=0; viewY=0; viewScale=0.6; applyGraphView(); });
 renderGraphEditor();
 const observer = new ResizeObserver(() => { scheduleRender(); drawGraphWires(); });
