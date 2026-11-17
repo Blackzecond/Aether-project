@@ -62,39 +62,22 @@
         <details class="graph-panel" id="graph-panel">
           <summary>
             <span><span class="eyebrow">ระบบเบื้องหลัง</span><strong>Node Graph</strong></span>
-            <span class="summary-meta">3 INPUTS · 1 OUTPUT <span class="chevron">⌄</span></span>
+            <span class="summary-meta" id="graph-meta">4 NODES · 3 LINKS <span class="chevron">⌄</span></span>
           </summary>
-          <p class="graph-description">ค่าจากตัวปรับด้านบนจะไหลผ่าน Node และถูกรวมเป็นค่าที่ Generator ใช้งานจริง</p>
-          <div class="node-flow" aria-label="ลำดับการทำงานของ Node Graph">
-            <div class="node-card">
-              <span class="node-type">NUMBER · 01</span>
-              <strong>Terrain Scale</strong>
-              <span class="node-value" id="node-scale">1.2</span>
-              <span class="node-port">● value</span>
-            </div>
-            <div class="flow-line"><span>↓</span></div>
-            <div class="node-card">
-              <span class="node-type">NUMBER · 02</span>
-              <strong>Roughness</strong>
-              <span class="node-value" id="node-roughness">0.55</span>
-              <span class="node-port">● value</span>
-            </div>
-            <div class="flow-line"><span>↓</span></div>
-            <div class="node-card">
-              <span class="node-type">NUMBER · 03</span>
-              <strong>Detail Layers</strong>
-              <span class="node-value" id="node-detail">4</span>
-              <span class="node-port">● value</span>
-            </div>
-            <div class="flow-line"><span>↓</span></div>
-            <div class="node-card output-node">
-              <span class="node-type">LANDSCAPE · OUTPUT</span>
-              <strong>Landscape Generator</strong>
-              <span class="node-value">พร้อมประมวลผล</span>
-              <span class="node-port">● settings</span>
-            </div>
+          <p class="graph-description">แตะช่อง OUTPUT ของ Node ต้นทาง แล้วแตะ INPUT ของ Node ปลายทางเพื่อเชื่อมต่อ</p>
+          <div class="graph-toolbar">
+            <select id="node-type" aria-label="ประเภท Node ที่ต้องการเพิ่ม">
+              <option value="number.constant">Number · ค่าคงที่</option>
+              <option value="math.add">Math · บวก</option>
+              <option value="math.multiply">Math · คูณ</option>
+              <option value="math.clamp">Math · จำกัดช่วง</option>
+            </select>
+            <button id="add-node" class="quiet-button" type="button">+ เพิ่ม Node</button>
           </div>
-          <p class="graph-footnote">รุ่นนี้เป็น Graph แบบกำหนดโครงสร้างไว้ก่อน ยังไม่รองรับการลาก Node หรือสร้างสายเชื่อมต่อด้วยมือ</p>
+          <p id="graph-status" class="graph-status" role="status">พร้อมใช้งาน · บันทึก Graph ในเครื่องอัตโนมัติ</p>
+          <div id="node-list" class="node-list" aria-label="รายการ Node"></div>
+          <button id="reset-graph" class="reset-graph-button" type="button">คืนค่า Graph เริ่มต้น</button>
+          <p class="graph-footnote">การเชื่อมต่อใช้การแตะเลือก ไม่ต้องลากเส้น รองรับการบันทึก Graph ไว้ในอุปกรณ์นี้โดยอัตโนมัติ</p>
         </details>
       </section>
 
