@@ -17,11 +17,12 @@ export function buildHeightfieldMesh(field: Heightfield, verticalScale = 1): Ter
   for (let x = width - 2; x >= 0; x -= 1) perimeter.push((height - 1) * width + x);
   for (let z = height - 2; z > 0; z -= 1) perimeter.push(z * width);
 
-  const baseY = Math.min(...values) * verticalScale - 0.18;
+  const baseY = Math.min(0, Math.min(...values) * verticalScale - 0.012);
   const wallStart = surfaceCount;
   const bottomStart = wallStart + perimeter.length * 2;
   const bottomCenter = bottomStart;
-  const vertexCount = bottomCenter + 1;
+  const groundStart = bottomCenter + 1;
+  const vertexCount = groundStart + 4;
   const positions = new Float32Array(vertexCount * 3);
   const normals = new Float32Array(vertexCount * 3);
   const put = (index: number, x: number, y: number, z: number, nx: number, ny: number, nz: number): void => {
@@ -79,6 +80,22 @@ export function buildHeightfieldMesh(field: Heightfield, verticalScale = 1): Ter
     const bottomB = wallStart + next * 2 + 1;
     indices.push(bottomCenter, bottomA, bottomB);
   });
+
+  // A large, level ground surface continues beyond the heightfield bounds.
+  // The terrain's tapered edge meets this plane instead of appearing suspended.
+  const groundMargin = 20;
+  const groundMinX = bounds.minX - groundMargin;
+  const groundMaxX = bounds.maxX + groundMargin;
+  const groundMinZ = bounds.minZ - groundMargin;
+  const groundMaxZ = bounds.maxZ + groundMargin;
+  put(groundStart, groundMinX, baseY, groundMinZ, 0, 1, 0);
+  put(groundStart + 1, groundMinX, baseY, groundMaxZ, 0, 1, 0);
+  put(groundStart + 2, groundMaxX, baseY, groundMinZ, 0, 1, 0);
+  put(groundStart + 3, groundMaxX, baseY, groundMaxZ, 0, 1, 0);
+  indices.push(
+    groundStart, groundStart + 1, groundStart + 2,
+    groundStart + 2, groundStart + 1, groundStart + 3,
+  );
 
   const indexArray = new Uint32Array(indices);
   return { positions, normals, indices: indexArray, vertexCount, triangleCount: indexArray.length / 3 };
