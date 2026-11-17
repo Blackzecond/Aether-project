@@ -191,5 +191,24 @@ export function buildSurfaceNets(volume:DensityVolume):VolumeMesh{
     const dz=(sample(gx,gy,gz-0.5)-sample(gx,gy,gz+0.5))/voxelSize.z,length=Math.hypot(dx,dy,dz)||1;
     normals[i]=dx/length;normals[i+1]=dy/length;normals[i+2]=dz/length;
   }
-  return{positions:pos,normals,indices:new Uint32Array(indices),vertexCount:pos.length/3,triangleCount:indices.length/3};
+  const chunkColumns=8,chunkRows=8,buckets=Array.from({length:chunkColumns*chunkRows},()=>[] as number[]);
+  for(let i=0;i<indices.length;i+=3){
+    const a=indices[i],b=indices[i+1],d=indices[i+2];
+    const cx=(pos[a*3]+pos[b*3]+pos[d*3])/3,cz=(pos[a*3+2]+pos[b*3+2]+pos[d*3+2])/3;
+    const gx=clamp(Math.floor((cx-origin.x)/((nx-1)*voxelSize.x)*chunkColumns),0,chunkColumns-1);
+    const gz=clamp(Math.floor((cz-origin.z)/((nz-1)*voxelSize.z)*chunkRows),0,chunkRows-1);
+    buckets[gz*chunkColumns+gx].push(a,b,d);
+  }
+  const ordered:number[]=[],chunks:VolumeMeshChunk[]=[];
+  for(let z=0;z<chunkRows;z++)for(let x=0;x<chunkColumns;x++){
+    const bucket=buckets[z*chunkColumns+x];if(bucket.length===0)continue;
+    const startIndex=ordered.length;ordered.push(...bucket);
+    chunks.push({
+      startIndex,indexCount:bucket.length,
+      centerX:origin.x+(x+0.5)*(nx-1)*voxelSize.x/chunkColumns,
+      centerZ:origin.z+(z+0.5)*(nz-1)*voxelSize.z/chunkRows,
+    });
+  }
+  const orderedIndices=new Uint32Array(ordered);
+  return{positions:pos,normals,indices:orderedIndices,vertexCount:pos.length/3,triangleCount:orderedIndices.length/3,chunks};
 }
