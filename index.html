@@ -18,7 +18,17 @@
     .lab-layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;margin-top:16px;align-items:start}
     .lab-panel{min-width:0;border:1px solid #34443d;border-radius:14px;overflow:hidden;background:#202e2a}
     .lab-canvas{height:min(68vh,680px);min-height:340px;background:#101b19}
+    .lab-canvas{position:relative}
     .lab-canvas canvas{width:100%;height:100%;display:block;touch-action:none}
+    .explore-pad{display:none;position:absolute;left:12px;bottom:12px;grid-template-columns:repeat(3,42px);grid-template-rows:repeat(2,42px);gap:5px;touch-action:none}
+    .lab-canvas.is-exploring .explore-pad{display:grid}
+    .explore-pad button{border:1px solid #a9c6ad88;border-radius:10px;background:#172b25cc;color:#e8f2e9;font-size:17px;backdrop-filter:blur(6px);touch-action:none}
+    .explore-pad [data-move="forward"]{grid-column:2;grid-row:1}
+    .explore-pad [data-move="left"]{grid-column:1;grid-row:2}
+    .explore-pad [data-move="back"]{grid-column:2;grid-row:2}
+    .explore-pad [data-move="right"]{grid-column:3;grid-row:2}
+    .explore-hint{display:none;position:absolute;right:12px;bottom:18px;max-width:145px;padding:8px 10px;border:1px solid #a9c6ad55;border-radius:9px;background:#172b25cc;color:#d7e5d8;font-size:9px;line-height:1.5;text-align:right;pointer-events:none}
+    .lab-canvas.is-exploring .explore-hint{display:block}
     .lab-controls{padding:14px}
     .lab-controls h2{font-size:15px;margin:0 0 5px}
     .lab-help{font-size:11px;color:#9daf9f;line-height:1.55;margin:0 0 12px}
@@ -45,9 +55,9 @@
     <div class="lab-layout">
       <section class="lab-panel" aria-label="ตัวอย่างภูมิประเทศ">
         <div class="lab-heading"><strong>พื้นผิวภูมิประเทศ · WebGL2</strong><button id="reset-camera" type="button">รีเซ็ตมุมกล้อง</button></div>
-        <div class="lab-canvas"><canvas id="terrain-canvas" aria-label="พื้นผิวภูมิประเทศสามมิติ"></canvas></div>
+        <div class="lab-canvas"><canvas id="terrain-canvas" aria-label="พื้นผิวภูมิประเทศสามมิติ"></canvas><div class="explore-pad" aria-label="ปุ่มเดินสำรวจ"><button type="button" data-move="forward" aria-label="เดินหน้า">▲</button><button type="button" data-move="left" aria-label="เดินซ้าย">◀</button><button type="button" data-move="back" aria-label="เดินถอยหลัง">▼</button><button type="button" data-move="right" aria-label="เดินขวา">▶</button></div><div class="explore-hint">ลากหน้าจอเพื่อหันมอง<br>กดปุ่มเพื่อเดิน · WASD บนคอมพิวเตอร์</div></div>
         <div class="lab-meta" id="lab-metrics"></div>
-        <p class="lab-note">ลากเพื่อหมุน · ใช้สองนิ้วเพื่อซูม · มุมมองโลกทั้งหมดแสดงภูมิประเทศและแนวแม่น้ำ ส่วนมุมมองตรวจสอบใช้ตรวจความสูง ความลาดชัน และข้อมูลการไหลของน้ำ</p>
+        <p class="lab-note">โลกใช้สเกล 1 หน่วย = 1 กม. · เลือกมุมมองสำรวจเพื่อยืนระดับสายตา 1.6 ม. แล้วเดินดูเกาะได้</p>
       </section>
       <aside class="lab-panel lab-controls">
         <h2>ปรับแต่งภูเขา</h2>
@@ -60,7 +70,7 @@
         <label for="detail-scale">ขนาดรายละเอียด <output id="detail-scale-value"></output></label><input id="detail-scale" type="range" min="1" max="5" step=".1" value="3.2">
         <label for="octaves">จำนวนชั้นรายละเอียด <output id="octaves-value"></output></label><input id="octaves" type="range" min="1" max="4" step="1" value="3">
         <label for="debug-mode">มุมมอง</label><select id="debug-mode">
-          <option value="world" selected>โลกทั้งหมด · ภูมิประเทศและแม่น้ำ</option><option value="shaded">พื้นผิวและแสง</option><option value="elevation">ระดับความสูง</option><option value="slope">ความลาดชัน</option><option value="normals">ทิศทางพื้นผิว</option><option value="wireframe">โครงตาข่าย</option><option value="hydrology">การไหลและลำน้ำ</option>
+          <option value="world" selected>โลกทั้งหมด · ภูมิประเทศและแม่น้ำ</option><option value="first-person">สำรวจ · ระดับสายตามนุษย์</option><option value="shaded">พื้นผิวและแสง</option><option value="elevation">ระดับความสูง</option><option value="slope">ความลาดชัน</option><option value="normals">ทิศทางพื้นผิว</option><option value="wireframe">โครงตาข่าย</option><option value="hydrology">การไหลและลำน้ำ</option>
         </select>
         <div class="lab-actions"><button id="new-seed" type="button">สุ่ม Seed</button><button id="reset-terrain" type="button">คืนค่า</button></div>
         <label for="seed">Seed <output id="seed-value"></output></label><input id="seed" type="range" min="1" max="99999" step="1" value="18273">
