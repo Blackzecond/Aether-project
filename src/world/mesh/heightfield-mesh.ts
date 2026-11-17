@@ -20,7 +20,8 @@ export function buildHeightfieldMesh(field: Heightfield, verticalScale = 1): Ter
   const baseY = Math.min(...values) * verticalScale - 0.18;
   const wallStart = surfaceCount;
   const bottomStart = wallStart + perimeter.length * 2;
-  const vertexCount = bottomStart + 4;
+  const bottomCenter = bottomStart;
+  const vertexCount = bottomCenter + 1;
   const positions = new Float32Array(vertexCount * 3);
   const normals = new Float32Array(vertexCount * 3);
   const put = (index: number, x: number, y: number, z: number, nx: number, ny: number, nz: number): void => {
@@ -63,14 +64,21 @@ export function buildHeightfieldMesh(field: Heightfield, verticalScale = 1): Ter
     indices.push(topA, topB, bottomA, topB, bottomB, bottomA);
   });
 
-  const corners = [
-    [bounds.minX, baseY, bounds.minZ],
-    [bounds.maxX, baseY, bounds.minZ],
-    [bounds.maxX, baseY, bounds.maxZ],
-    [bounds.minX, baseY, bounds.maxZ],
-  ];
-  corners.forEach((point, i) => put(bottomStart + i, point[0], point[1], point[2], 0, -1, 0));
-  indices.push(bottomStart, bottomStart + 1, bottomStart + 2, bottomStart, bottomStart + 2, bottomStart + 3);
+  put(
+    bottomCenter,
+    (bounds.minX + bounds.maxX) * 0.5,
+    baseY,
+    (bounds.minZ + bounds.maxZ) * 0.5,
+    0,
+    -1,
+    0,
+  );
+  perimeter.forEach((_, i) => {
+    const next = (i + 1) % perimeter.length;
+    const bottomA = wallStart + i * 2 + 1;
+    const bottomB = wallStart + next * 2 + 1;
+    indices.push(bottomCenter, bottomA, bottomB);
+  });
 
   const indexArray = new Uint32Array(indices);
   return { positions, normals, indices: indexArray, vertexCount, triangleCount: indexArray.length / 3 };
