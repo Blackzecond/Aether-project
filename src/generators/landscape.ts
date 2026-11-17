@@ -6,6 +6,7 @@ export interface LandscapeOptions {
   roughness: number;
   octaves: number;
   mist: number;
+  forest: number;
 }
 
 const palettes = [
@@ -67,6 +68,39 @@ export function drawLandscape(
     context.closePath();
     context.fillStyle = layer.color;
     context.fill();
+  }
+
+  const forestDensity = Math.max(0, Math.min(1, options.forest));
+  if (forestDensity > 0.01) {
+    let randomState = (options.seed ^ 0x6d2b79f5) >>> 0;
+    const random = (): number => {
+      randomState = (randomState + 0x6d2b79f5) >>> 0;
+      let value = randomState;
+      value = Math.imul(value ^ (value >>> 15), value | 1);
+      value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+      return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+    };
+    const treeCount = Math.round(8 + forestDensity * 76);
+    for (let index = 0; index < treeCount; index += 1) {
+      const x = random() * width;
+      const depth = random();
+      const size = height * (0.035 + depth * 0.105) * (0.45 + forestDensity * 0.65);
+      const baseY = height * (0.91 + depth * 0.075);
+      const crownWidth = size * (0.34 + random() * 0.22);
+      const crownHeight = size * (0.72 + random() * 0.35);
+      const shade = random();
+      context.fillStyle = shade > 0.58 ? palette.near : palette.mid;
+      context.globalAlpha = 0.48 + depth * 0.42;
+      context.beginPath();
+      context.moveTo(x, baseY - crownHeight);
+      context.lineTo(x - crownWidth, baseY);
+      context.lineTo(x + crownWidth, baseY);
+      context.closePath();
+      context.fill();
+      context.globalAlpha = 1;
+      context.fillStyle = palette.near;
+      context.fillRect(x - size * 0.035, baseY - size * 0.12, size * 0.07, size * 0.12);
+    }
   }
 
   const mistStrength = Math.max(0, Math.min(1, options.mist));
