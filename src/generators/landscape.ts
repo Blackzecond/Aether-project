@@ -1,4 +1,3 @@
-import { fbm2 } from "../core/noise";
 import { createLandscapeWorld, sampleSurface, type LandscapeOptions, type LandscapeWorld, type TerrainLayer } from "./world";
 
 export type { LandscapeOptions } from "./world";
