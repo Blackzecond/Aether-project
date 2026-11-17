@@ -192,7 +192,7 @@ function drawGraphWires(): void {
 function applyGraphView(): void { graphStage.style.transform = "translate(" + viewX + "px," + viewY + "px) scale(" + viewScale + ")"; drawGraphWires(); }
 function renderGraphEditor(): void {
   for (const child of Array.from(graphStage.children)) if (child !== wireLayer) child.remove();
-  graphMeta.textContent = graphState.nodes.length + " NODES · " + graphState.edges.length + " LINKS";
+  graphMeta.textContent = graphState.nodes.length + " เครื่องมือ · " + graphState.edges.length + " การเชื่อมต่อ";
   const query = graphSearchInput.value.trim().toLocaleLowerCase();
   const categoryFilter = graphCategorySelect.value;
   const evaluatedNodes = evaluateGraph(graphState, registry).values;
@@ -238,7 +238,7 @@ function renderGraphEditor(): void {
       card.dataset.nodeId = node.id; const pos = nodePosition(node.id, graphState.nodes.findIndex((item) => item.id === node.id)); card.style.left = pos.x + "px"; card.style.top = pos.y + "px";
       const heading = createElement("div", "editor-node-heading node-drag-handle");
       const identity = createElement("div", "editor-node-identity");
-      identity.append(createElement("span", "node-type", info.category), createElement("strong", "editor-node-title", info.title), createElement("span", "node-id", node.id)); heading.append(identity);
+      const categoryTitle: Record<string, string> = { NUMBER: "ตัวเลข", MATH: "คำนวณ", OUTPUT: "ผลลัพธ์", NODE: "เครื่องมือ" };\n      identity.append(createElement("span", "node-type", categoryTitle[info.category] ?? "เครื่องมือ"), createElement("strong", "editor-node-title", info.title), createElement("span", "node-id", node.id)); heading.append(identity);
       const actions = createElement("div", "node-actions");
       if (!DEFAULT_NODE_IDS.has(node.id)) { const remove = createElement("button", "remove-node", "ลบ"); remove.type = "button"; remove.dataset.action = "remove-node"; remove.dataset.nodeId = node.id; actions.append(remove); }
       if (actions.childElementCount) heading.append(actions); card.append(heading);
@@ -251,7 +251,7 @@ function renderGraphEditor(): void {
         input.dataset.nodeId = node.id; input.dataset.param = "value"; label.append(input); card.append(label);
       }
       const ports = createElement("div", "node-ports"), ins = createElement("div", "port-group"), outs = createElement("div", "port-group output-group");
-      ins.append(createElement("span", "port-heading", "INPUT")); outs.append(createElement("span", "port-heading", "OUTPUT"));
+      ins.append(createElement("span", "port-heading", "รับค่า")); outs.append(createElement("span", "port-heading", "ส่งค่า"));
       if (!definition.inputs.length) ins.append(createElement("span", "port-empty", "ไม่มีช่องรับ"));
       for (const port of definition.inputs) { const edge = graphState.edges.find((item) => item.toNodeId === node.id && item.toPort === port); const from = edge ? graphState.nodes.find((item) => item.id === edge.fromNodeId)?.id : null;
         const btn = createElement("button", "port-button input-port", edge ? "← " + port + " · " + (from ?? "connected") : "← " + port); btn.type = "button"; btn.dataset.action = "connect-input"; btn.dataset.nodeId = node.id; btn.dataset.port = port; btn.dataset.kind = "in"; ins.append(btn); }
