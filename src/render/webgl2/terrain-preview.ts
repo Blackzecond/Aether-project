@@ -1,20 +1,28 @@
 import { buildHeightfieldMesh } from "../../world/mesh/heightfield-mesh";
 import type { Heightfield } from "../../world/fields/heightfield";
+import type { DrainageField } from "../../world/hydrology/drainage";
+import type { RiverNetwork } from "../../world/hydrology/rivers";
 
-export type TerrainViewMode = "shaded" | "elevation" | "slope" | "normals" | "wireframe";
+export type TerrainViewMode = "shaded" | "elevation" | "slope" | "normals" | "wireframe" | "hydrology";
 
 const vertexSource = `#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPosition;
 layout(location=1) in vec3 aNormal;
+layout(location=2) in float aAccumulation;
+layout(location=3) in float aChannel;
 uniform mat4 uMvp;
 uniform mat4 uModel;
 out vec3 vNormal;
 out vec3 vPosition;
+out float vAccumulation;
+out float vChannel;
 void main() {
   vec4 world = uModel * vec4(aPosition, 1.0);
   vPosition = world.xyz;
   vNormal = mat3(uModel) * aNormal;
+  vAccumulation = aAccumulation;
+  vChannel = aChannel;
   gl_Position = uMvp * vec4(aPosition, 1.0);
 }`;
 
@@ -22,7 +30,10 @@ const fragmentSource = `#version 300 es
 precision highp float;
 in vec3 vNormal;
 in vec3 vPosition;
+in float vAccumulation;
+in float vChannel;
 uniform int uMode;
+uniform float uMaxAccumulation;
 uniform vec3 uCameraPosition;
 out vec4 outColor;
 
@@ -46,7 +57,13 @@ void main() {
   float slope = 1.0 - clamp(n.y, 0.0, 1.0);
   vec3 color;
 
-  if (uMode == 1) {
+  if (uMode == 5) {
+    float flow = clamp(log(1.0 + vAccumulation) / log(1.0 + max(uMaxAccumulation, 1.0)), 0.0, 1.0);
+    color = mix(vec3(0.035, 0.10, 0.17), vec3(0.12, 0.58, 0.58), smoothstep(0.02, 0.48, flow));
+    color = mix(color, vec3(0.91, 0.70, 0.31), smoothstep(0.48, 0.95, flow));
+    color = mix(color, vec3(0.96, 0.88, 0.62), smoothstep(0.88, 1.0, flow));
+    color = mix(color, vec3(0.96, 0.88, 0.55), vChannel * 0.96);
+  } else if (uMode == 1) {
     color = mix(vec3(0.08,0.17,0.24), vec3(0.88,0.84,0.65), height);
   } else if (uMode == 2) {
     color = mix(vec3(0.12,0.36,0.25), vec3(0.91,0.43,0.22), smoothstep(0.04,0.78,slope));
@@ -143,7 +160,7 @@ function multiply(a: Float32Array, b: Float32Array): Float32Array {
   return out;
 }
 
-const MODE: Record<TerrainViewMode, number> = { shaded: 0, elevation: 1, slope: 2, normals: 3, wireframe: 4 };
+const MODE: Record<TerrainViewMode, number> = { shaded: 0, elevation: 1, slope: 2, normals: 3, wireframe: 4, hydrology: 5 };
 
 export class TerrainPreviewRenderer {
   private readonly gl: WebGL2RenderingContext;
@@ -153,6 +170,11 @@ export class TerrainPreviewRenderer {
   private readonly normalBuffer: WebGLBuffer;
   private readonly indexBuffer: WebGLBuffer;
   private readonly lineBuffer: WebGLBuffer;
+  private readonly accumulationBuffer: WebGLBuffer;
+  private readonly channelBuffer: WebGLBuffer;
+  private maximumAccumulation = 1;
+  private vertexCount = 0;
+  private surfaceVertexCount = 0;
   private triangleCount = 0;
   private lineCount = 0;
   private mode: TerrainViewMode = "shaded";
@@ -166,6 +188,7 @@ export class TerrainPreviewRenderer {
   private readonly modelLocation: WebGLUniformLocation;
   private readonly modeLocation: WebGLUniformLocation;
   private readonly cameraLocation: WebGLUniformLocation;
+  private readonly maxAccumulationLocation: WebGLUniformLocation;
   private readonly pointers = new Map<number, { x: number; y: number }>();
   private previousPinch = 0;
 
@@ -180,17 +203,22 @@ export class TerrainPreviewRenderer {
     const normal = gl.createBuffer();
     const indices = gl.createBuffer();
     const lines = gl.createBuffer();
-    if (!vao || !position || !normal || !indices || !lines) throw new Error("ไม่สามารถจองหน่วยความจำกราฟิกได้");
+    const accumulation = gl.createBuffer();
+    const channels = gl.createBuffer();
+    if (!vao || !position || !normal || !indices || !lines || !accumulation || !channels) throw new Error("ไม่สามารถจองหน่วยความจำกราฟิกได้");
 
     this.vao = vao;
     this.positionBuffer = position;
     this.normalBuffer = normal;
     this.indexBuffer = indices;
     this.lineBuffer = lines;
+    this.accumulationBuffer = accumulation;
+    this.channelBuffer = channels;
     this.mvpLocation = gl.getUniformLocation(this.program, "uMvp")!;
     this.modelLocation = gl.getUniformLocation(this.program, "uModel")!;
     this.modeLocation = gl.getUniformLocation(this.program, "uMode")!;
     this.cameraLocation = gl.getUniformLocation(this.program, "uCameraPosition")!;
+    this.maxAccumulationLocation = gl.getUniformLocation(this.program, "uMaxAccumulation")!;
 
     gl.bindVertexArray(vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, position);
@@ -200,6 +228,12 @@ export class TerrainPreviewRenderer {
     gl.enableVertexAttribArray(1);
     gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indices);
+    gl.bindBuffer(gl.ARRAY_BUFFER, accumulation);
+    gl.enableVertexAttribArray(2);
+    gl.vertexAttribPointer(2, 1, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, channels);
+    gl.enableVertexAttribArray(3);
+    gl.vertexAttribPointer(3, 1, gl.FLOAT, false, 0, 0);
     gl.bindVertexArray(null);
 
     gl.enable(gl.DEPTH_TEST);
@@ -263,6 +297,9 @@ export class TerrainPreviewRenderer {
   setTerrain(field: Heightfield): void {
     const gl = this.gl;
     const mesh = buildHeightfieldMesh(field, 1.18);
+    this.vertexCount = mesh.vertexCount;
+    this.surfaceVertexCount = field.width * field.height;
+    this.maximumAccumulation = 1;
     let minHeight = Infinity;
     let maxHeight = -Infinity;
     for (const value of field.values) {
@@ -311,10 +348,33 @@ export class TerrainPreviewRenderer {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.lineBuffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, lines, gl.STATIC_DRAW);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.accumulationBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.vertexCount), gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.channelBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.vertexCount), gl.DYNAMIC_DRAW);
     gl.bindVertexArray(null);
 
     this.triangleCount = mesh.indices.length;
     this.lineCount = lines.length;
+    this.render();
+  }
+
+  setHydrology(drainage: DrainageField, rivers: RiverNetwork): void {
+    if (drainage.accumulation.length !== this.surfaceVertexCount || rivers.channelMask.length !== this.surfaceVertexCount) {
+      throw new Error("Hydrology data does not match the terrain mesh");
+    }
+    const accumulation = new Float32Array(this.vertexCount);
+    const channels = new Float32Array(this.vertexCount);
+    for (let i = 0; i < this.surfaceVertexCount; i += 1) {
+      accumulation[i] = drainage.accumulation[i];
+      channels[i] = rivers.channelMask[i];
+    }
+    this.maximumAccumulation = Math.max(1, drainage.diagnostics.maximumAccumulation);
+    const gl = this.gl;
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.accumulationBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, accumulation, gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.channelBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, channels, gl.DYNAMIC_DRAW);
     this.render();
   }
 
@@ -365,6 +425,7 @@ export class TerrainPreviewRenderer {
     gl.uniformMatrix4fv(this.modelLocation, false, model);
     gl.uniform1i(this.modeLocation, MODE[this.mode]);
     gl.uniform3f(this.cameraLocation, camera[0], camera[1], camera[2]);
+    gl.uniform1f(this.maxAccumulationLocation, this.maximumAccumulation);
     gl.bindVertexArray(this.vao);
 
     if (this.mode === "wireframe") {
@@ -385,6 +446,8 @@ export class TerrainPreviewRenderer {
     gl.deleteBuffer(this.normalBuffer);
     gl.deleteBuffer(this.indexBuffer);
     gl.deleteBuffer(this.lineBuffer);
+    gl.deleteBuffer(this.accumulationBuffer);
+    gl.deleteBuffer(this.channelBuffer);
     gl.deleteVertexArray(this.vao);
     gl.deleteProgram(this.program);
   }
