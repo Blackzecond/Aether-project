@@ -5,6 +5,7 @@ import { sampleElevation, sampleSurface, sampleCurvature } from "./fields/height
 import { buildHeightfieldMesh } from "./mesh/heightfield-mesh";
 import { createHeightfield } from "./fields/heightfield";
 import { buildDrainageField } from "./hydrology/drainage";
+import { extractRiverNetwork } from "./hydrology/rivers";
 function recipe(overrides: Partial<typeof DEFAULT_TERRAIN_RECIPE["landform"]> = {}) {
   return { ...DEFAULT_TERRAIN_RECIPE, landform: { ...DEFAULT_TERRAIN_RECIPE.landform, ...overrides } };
 }
@@ -106,6 +107,52 @@ describe("world foundation v2", () => {
         expect(drainage.filledElevation[downstream]).toBeLessThanOrEqual(drainage.filledElevation[index]);
       }
     }
+  });
+
+  it("extracts connected downhill river channels from contributing area", () => {
+    const width = 9, height = 9;
+    const values = new Float32Array(width * height).fill(0.5);
+    for (let z = 0; z < height; z += 1) {
+      for (let x = 0; x < width; x += 1) {
+        if (x === 0 || z === 0 || x === width - 1 || z === height - 1) values[z * width + x] = 0.01;
+      }
+    }
+    values[4 * width + 4] = 0.1;
+    const field = createHeightfield(width, height, values);
+    const drainage = buildDrainageField(field);
+    const cellArea = ((field.bounds.maxX - field.bounds.minX) / (width - 1))
+      * ((field.bounds.maxZ - field.bounds.minZ) / (height - 1));
+    const rivers = extractRiverNetwork(field, drainage, { minimumContributingArea: cellArea * 2 });
+
+    expect(rivers.diagnostics.channelCellCount).toBe(rivers.channelIndices.length);
+    expect(rivers.channelIndices.length).toBeGreaterThan(0);
+    expect(rivers.headwaterIndices.length).toBeGreaterThan(0);
+    expect(rivers.outletIndices.length).toBeGreaterThan(0);
+    for (const index of rivers.channelIndices) {
+      expect(rivers.channelMask[index]).toBe(1);
+      expect(rivers.width[index]).toBeGreaterThan(0);
+      expect(rivers.width[index]).toBeLessThanOrEqual(Math.min(
+        (field.bounds.maxX - field.bounds.minX) / (width - 1),
+        (field.bounds.maxZ - field.bounds.minZ) / (height - 1),
+      ) * 3 + 1e-6);
+      const next = rivers.downstream[index];
+      if (next >= 0) {
+        expect(rivers.channelMask[next]).toBe(1);
+        expect(drainage.accumulation[next]).toBeGreaterThanOrEqual(drainage.accumulation[index]);
+        expect(drainage.filledElevation[next]).toBeLessThanOrEqual(drainage.filledElevation[index]);
+      } else {
+        const x = index % width;
+        const z = Math.floor(index / width);
+        expect(x === 0 || z === 0 || x === width - 1 || z === height - 1).toBe(true);
+      }
+    }
+    expect(Array.from(rivers.width).every(Number.isFinite)).toBe(true);
+  });
+
+  it("rejects invalid river extraction thresholds", () => {
+    const field = generateTerrain(recipe()).heightfield;
+    const drainage = buildDrainageField(field);
+    expect(() => extractRiverNetwork(field, drainage, { minimumContributingArea: 0 })).toThrow();
   });
   it("isolates subsystem seeds", () => {
     expect(deriveSubsystemSeed(42, "forest")).toBe(deriveSubsystemSeed(42, "forest"));
