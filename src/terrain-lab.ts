@@ -121,12 +121,20 @@ const animateMovement=(time:number):void=>{
 };
 document.querySelectorAll<HTMLButtonElement>("[data-move]").forEach(button=>{
   button.addEventListener("pointerdown",event=>{
-    event.preventDefault();stopMovement();movementDirection=button.dataset.move!;
-    previousMovementTime=0;movementFrame=window.requestAnimationFrame(animateMovement);
+    if(event.button!==0)return;
+    event.preventDefault();
+    stopMovement();
+    button.setPointerCapture(event.pointerId);
+    movementDirection=button.dataset.move!;
+    previousMovementTime=0;
+    movementFrame=window.requestAnimationFrame(animateMovement);
   });
-  for(const name of ["pointerup","pointercancel","pointerleave","lostpointercapture"])button.addEventListener(name,stopMovement);
+  for(const name of ["pointerup","pointercancel","lostpointercapture"])button.addEventListener(name,stopMovement);
 });
+window.addEventListener("pointerup",stopMovement);
+window.addEventListener("pointercancel",stopMovement);
 window.addEventListener("blur",stopMovement);
+document.addEventListener("visibilitychange",()=>{if(document.hidden)stopMovement();});
 document.querySelector<HTMLInputElement>("#seed")!.addEventListener("input",event=>{
   recipe={...recipe,seed:Number((event.currentTarget as HTMLInputElement).value)};scheduleRender(false);
 });
