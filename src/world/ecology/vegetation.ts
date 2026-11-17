@@ -63,8 +63,8 @@ export function generateVegetation(
     for (let gx = 2; gx < field.width - 2; gx += 3) {
       const patch = hash(seed + 17, Math.floor(gx / 10), Math.floor(gz / 10));
       if (hash(seed, gx, gz) > (patch > 0.24 ? 0.84 : 0.035)) continue;
-      const jitterX = (hash(seed + 31, gx, gz) - 0.5) * 2.2;
-      const jitterZ = (hash(seed + 47, gx, gz) - 0.5) * 2.2;
+      const jitterX = (hash(seed + 31, gx, gz) - 0.5) * 1.45;
+      const jitterZ = (hash(seed + 47, gx, gz) - 0.5) * 1.45;
       const gridX = Math.max(1, Math.min(field.width - 2, gx + jitterX));
       const gridZ = Math.max(1, Math.min(field.height - 2, gz + jitterZ));
       const { x, z } = toWorld(gridX, gridZ);
@@ -79,7 +79,7 @@ export function generateVegetation(
         height: 0.009 + hash(seed + 83, gx, gz) * 0.010,
         tint: hash(seed + 97, gx, gz),
       });
-      if (instances.length >= 2600) break;
+      if (instances.length >= 6000) break;
     }
     if (instances.length >= 2600) break;
   }
