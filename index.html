@@ -65,6 +65,11 @@
             <span class="summary-meta"><span id="graph-count">4 NODES · 3 LINKS</span> <span class="chevron">⌄</span></span>
           </summary>
           <p class="graph-description">แตะช่อง OUTPUT ของ Node ต้นทาง แล้วแตะ INPUT ของ Node ปลายทางเพื่อเชื่อมต่อ</p>
+          <div class="graph-file-toolbar">
+            <button id="export-graph" class="quiet-button" type="button">ส่งออก JSON ↓</button>
+            <button id="import-graph" class="quiet-button" type="button">นำเข้า JSON ↑</button>
+            <input id="graph-file" type="file" accept=".json,application/json" hidden />
+          </div>
           <div class="graph-toolbar">
             <select id="node-type" aria-label="ประเภท Node ที่ต้องการเพิ่ม">
               <option value="number.constant">Number · ค่าคงที่</option>
@@ -77,7 +82,7 @@
           <p id="graph-status" class="graph-status" role="status">พร้อมใช้งาน · บันทึก Graph ในเครื่องอัตโนมัติ</p>
           <div id="node-list" class="node-list" aria-label="รายการ Node"></div>
           <button id="reset-graph" class="reset-graph-button" type="button">คืนค่า Graph เริ่มต้น</button>
-          <p class="graph-footnote">การเชื่อมต่อใช้การแตะเลือก ไม่ต้องลากเส้น รองรับการบันทึก Graph ไว้ในอุปกรณ์นี้โดยอัตโนมัติ</p>
+          <p class="graph-footnote">บันทึกในเครื่องอัตโนมัติ · ส่งออกหรือนำเข้า JSON เพื่อย้าย Graph · ใช้ปุ่มลูกศรจัดลำดับ Node</p>
         </details>
       </section>
 
