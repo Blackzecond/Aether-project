@@ -44,7 +44,7 @@ describe("world foundation v2", () => {
   it("builds an indexed mesh with valid indices and finite normals", () => {
     const field = generateTerrain(recipe()).heightfield;
     const mesh = buildHeightfieldMesh(field);
-    const perimeterVertices = 4 * (field.width + field.height) - 8;
+    const perimeterVertices = 2 * (field.width + field.height) - 4;
     const expectedVertices = field.width * field.height + perimeterVertices * 2 + 4;
     const expectedTriangles = (field.width - 1) * (field.height - 1) * 2 + perimeterVertices * 2 + 2;
     expect(mesh.vertexCount).toBe(expectedVertices);
