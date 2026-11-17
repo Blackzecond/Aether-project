@@ -134,7 +134,7 @@ export function buildSurfaceNets(volume:DensityVolume):VolumeMesh{
       const row=nx*y;
       for(let x=0;x<nx-1;x++){
         const i=row+x+slice*z,d0=D[i],d1=D[i+1],d2=D[i+nx],d3=D[i+nx+1],d4=D[i+slice],d5=D[i+slice+1],d6=D[i+slice+nx],d7=D[i+slice+nx+1];
-        const sign=d0>0,mask=(d0>0)|((d1>0)<<1)|((d2>0)<<2)|((d3>0)<<3)|((d4>0)<<4)|((d5>0)<<5)|((d6>0)<<6)|((d7>0)<<7);
+        const sign=d0>0,mask=(d0>0?1:0)|((d1>0?1:0)<<1)|((d2>0?1:0)<<2)|((d3>0?1:0)<<3)|((d4>0?1:0)<<4)|((d5>0?1:0)<<5)|((d6>0?1:0)<<6)|((d7>0?1:0)<<7);
         if(mask===0||mask===255)continue;
         let sx=0,sy=0,sz=0,count=0;
         const edge=(a:number,b:number,ox:number,oy:number,oz:number)=>{if((a>0)===(b>0))return;const t=a/(a-b);sx+=ox+t;sy+=oy;sz+=oz;count++;};
