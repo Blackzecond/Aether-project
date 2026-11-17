@@ -176,6 +176,13 @@ describe("world foundation v2", () => {
     expect(first.instances.every(tree => tree.height > 0 && tree.y > 0
       && tree.x >= field.bounds.minX && tree.x <= field.bounds.maxX
       && tree.z >= field.bounds.minZ && tree.z <= field.bounds.maxZ)).toBe(true);
+    expect(first.groundCover).toEqual(second.groundCover);
+    expect(first.groundCover.length).toBeGreaterThan(0);
+    expect(first.diagnostics.groundCover).toBe(first.groundCover.length);
+    expect(new Set(first.groundCover.map(item => item.kind))).toEqual(new Set([0, 1, 2, 3]));
+    expect(first.groundCover.every(item => item.scale > 0 && item.y > 0
+      && item.x >= field.bounds.minX && item.x <= field.bounds.maxX
+      && item.z >= field.bounds.minZ && item.z <= field.bounds.maxZ)).toBe(true);
   });
   it("isolates subsystem seeds", () => {
     expect(deriveSubsystemSeed(42, "forest")).toBe(deriveSubsystemSeed(42, "forest"));
