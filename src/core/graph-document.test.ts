@@ -38,6 +38,19 @@ describe("graph document interchange", () => {
     expect(() => parseGraphDocument(tooLargeNumber)).toThrow(/finite numbers/);
   });
 
+  it("rejects non-finite values when serializing", () => {
+    const invalid: GraphDocument = {
+      nodes: [{ id: "bad", type: "number.constant", params: { value: Number.NaN } }],
+      edges: [],
+    };
+    expect(() => serializeGraphDocument(invalid)).toThrow(/finite numbers/);
+  });
+
+  it("rejects edges that reference missing nodes", () => {
+    const invalid = '{"version":1,"nodes":[],"edges":[{"id":"e","fromNodeId":"missing","fromPort":"value","toNodeId":"also-missing","toPort":"a"}]}';
+    expect(() => parseGraphDocument(invalid)).toThrow(/node that does not exist/);
+  });
+
   it("rejects malformed JSON", () => {
     expect(() => parseGraphDocument("{")).toThrow(/valid JSON/);
   });
