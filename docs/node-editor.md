@@ -23,3 +23,14 @@ The editor uses a freeform 2D canvas with DOM node cards and an SVG wire layer.
 - Pointer Events support mouse, pen, and touch. Canvas gestures use pointer capture and `touch-action: none`.
 - The graph evaluator remains independent of presentation and layout.
 - The canvas uses a fixed logical world size to avoid unbounded rendering surfaces.
+
+
+## What the current graph controls
+The current graph is a live parameter pipeline for the Landscape preview, not a general-purpose visual programming system yet:
+- `number.constant` creates a numeric value.
+- `math.add`, `math.multiply`, and `math.clamp` transform numeric values.
+- `landscape.compose` consumes `scale`, `roughness`, and `octaves` and passes them to the landscape generator.
+- Every node displays its evaluated output. Editing a Number value updates the preview immediately without rebuilding the editor DOM or interrupting typing.
+- The Fit button frames all nodes when the graph panel opens, which is especially important on narrow mobile screens.
+
+Example: add two Number nodes and one Math Add node; connect their outputs to the Math Add inputs `a` and `b`; connect the Math Add output to Landscape Generator input `scale`. The resulting sum controls the landscape scale.
