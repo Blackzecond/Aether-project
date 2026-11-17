@@ -460,7 +460,7 @@ graphViewport.addEventListener("pointerdown", (event) => {
     gesture = { kind: "node", pointerId: event.pointerId, sx: event.clientX, sy: event.clientY, ox: pos.x, oy: pos.y, id };
     card.classList.add("is-dragging"); graphViewport.setPointerCapture(event.pointerId); event.preventDefault(); return;
   }
-  if (!card && (target === graphViewport || target === graphStage || target === wireLayer)) {
+  if (!card && (target === graphViewport || target === graphStage || event.target === wireLayer)) {
     gesture = { kind: "pan", pointerId: event.pointerId, sx: event.clientX, sy: event.clientY, ox: viewX, oy: viewY }; graphViewport.setPointerCapture(event.pointerId);
   }
 });
