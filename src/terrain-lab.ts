@@ -53,12 +53,29 @@ window.addEventListener("keydown",event=>{
   const key=event.key.toLowerCase();
   renderer.movePlayer(key==="w"||key==="arrowup"?1:key==="s"||key==="arrowdown"?-1:0,key==="d"||key==="arrowright"?1:key==="a"||key==="arrowleft"?-1:0);
 });
-let movementTimer:number|undefined;
-const stopMovement=():void=>{if(movementTimer!==undefined){window.clearInterval(movementTimer);movementTimer=undefined;}};
+let movementFrame=0;
+let movementDirection:string|undefined;
+let previousMovementTime=0;
+const stopMovement=():void=>{
+  movementDirection=undefined;
+  previousMovementTime=0;
+  if(movementFrame)window.cancelAnimationFrame(movementFrame);
+  movementFrame=0;
+};
+const animateMovement=(time:number):void=>{
+  if(!movementDirection)return;
+  const delta=previousMovementTime?Math.min((time-previousMovementTime)/1000,0.05):1/60;
+  previousMovementTime=time;
+  const direction=movementDirection;
+  renderer.movePlayer(direction==="forward"?1:direction==="back"?-1:0,direction==="right"?1:direction==="left"?-1:0,delta);
+  movementFrame=window.requestAnimationFrame(animateMovement);
+};
 document.querySelectorAll<HTMLButtonElement>("[data-move]").forEach(button=>{
-  const move=():void=>{const direction=button.dataset.move!;renderer.movePlayer(direction==="forward"?1:direction==="back"?-1:0,direction==="right"?1:direction==="left"?-1:0);};
-  button.addEventListener("pointerdown",event=>{event.preventDefault();stopMovement();move();movementTimer=window.setInterval(move,100);});
-  for(const name of ["pointerup","pointercancel","pointerleave"])button.addEventListener(name,stopMovement);
+  button.addEventListener("pointerdown",event=>{
+    event.preventDefault();stopMovement();movementDirection=button.dataset.move!;
+    previousMovementTime=0;movementFrame=window.requestAnimationFrame(animateMovement);
+  });
+  for(const name of ["pointerup","pointercancel","pointerleave","lostpointercapture"])button.addEventListener(name,stopMovement);
 });
 window.addEventListener("blur",stopMovement);
 document.querySelector<HTMLInputElement>("#seed")!.addEventListener("input",event=>{
