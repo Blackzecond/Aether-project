@@ -269,7 +269,7 @@ export class TerrainPreviewRenderer {
       minHeight = Math.min(minHeight, value);
       maxHeight = Math.max(maxHeight, value);
     }
-    const baseY = minHeight * 1.18 - 0.18;
+    const baseY = Math.min(0, minHeight * 1.18 - 0.012);
     const maxY = maxHeight * 1.18;
     this.cameraTarget = [
       (field.bounds.minX + field.bounds.maxX) * 0.5,
@@ -357,7 +357,7 @@ export class TerrainPreviewRenderer {
       this.cameraTarget[2] + Math.cos(this.azimuth) * horizontal,
     ];
     const view = lookAt(camera, this.cameraTarget, [0, 1, 0]);
-    const projection = perspective(0.72, this.canvas.width / Math.max(1, this.canvas.height), 0.1, 24);
+    const projection = perspective(0.72, this.canvas.width / Math.max(1, this.canvas.height), 0.1, 100);
     const mvp = multiply(projection, view);
     const model = new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
 
