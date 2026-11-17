@@ -2,21 +2,26 @@ import "./style.css";
 import { drawLandscape } from "./generators/landscape";
 import { getRenderSize } from "./core/quality";
 
-const canvas = document.querySelector<HTMLCanvasElement>("#preview");
-const seedInput = document.querySelector<HTMLInputElement>("#seed");
-const scaleInput = document.querySelector<HTMLInputElement>("#scale");
-const roughnessInput = document.querySelector<HTMLInputElement>("#roughness");
-const detailInput = document.querySelector<HTMLInputElement>("#detail");
+function requiredElement<T extends Element>(selector: string): T {
+  const element = document.querySelector<T>(selector);
+  if (!element) throw new Error(`Aether workspace is missing required element: ${selector}`);
+  return element;
+}
+
+const canvas = requiredElement<HTMLCanvasElement>("#preview");
+const seedInput = requiredElement<HTMLInputElement>("#seed");
+const scaleInput = requiredElement<HTMLInputElement>("#scale");
+const roughnessInput = requiredElement<HTMLInputElement>("#roughness");
+const detailInput = requiredElement<HTMLInputElement>("#detail");
 const renderStatus = document.querySelector<HTMLElement>("#render-status");
 const seedLabel = document.querySelector<HTMLElement>("#seed-label");
 const resolutionLabel = document.querySelector<HTMLElement>("#resolution-label");
 
-if (!canvas || !seedInput || !scaleInput || !roughnessInput || !detailInput) {
-  throw new Error("Aether workspace could not initialize: required controls are missing.");
-}
-
-const context = canvas.getContext("2d", { alpha: false, desynchronized: true });
-if (!context) throw new Error("This browser does not provide a 2D canvas context.");
+const context = (() => {
+  const value = canvas.getContext("2d", { alpha: false, desynchronized: true });
+  if (!value) throw new Error("This browser does not provide a 2D canvas context.");
+  return value;
+})();
 
 function readOptions() {
   return {
@@ -39,17 +44,18 @@ function render(): void {
 
   context.setTransform(size.scale, 0, 0, size.scale, 0, 0);
   context.clearRect(0, 0, rect.width, rect.height);
-  drawLandscape(context, rect.width, rect.height, readOptions());
+  const options = readOptions();
+  drawLandscape(context, rect.width, rect.height, options);
 
   if (renderStatus) renderStatus.textContent = "GENERATED";
-  if (seedLabel) seedLabel.textContent = `SEED ${readOptions().seed}`;
+  if (seedLabel) seedLabel.textContent = `SEED ${options.seed}`;
   if (resolutionLabel) resolutionLabel.textContent = `${size.width} × ${size.height} PX`;
 }
 
 function updateOutputs(): void {
-  document.querySelector("#scale-value")!.textContent = Number(scaleInput.value).toFixed(1);
-  document.querySelector("#roughness-value")!.textContent = Number(roughnessInput.value).toFixed(2);
-  document.querySelector("#detail-value")!.textContent = detailInput.value;
+  requiredElement<HTMLOutputElement>("#scale-value").textContent = Number(scaleInput.value).toFixed(1);
+  requiredElement<HTMLOutputElement>("#roughness-value").textContent = Number(roughnessInput.value).toFixed(2);
+  requiredElement<HTMLOutputElement>("#detail-value").textContent = detailInput.value;
 }
 
 let renderQueued = false;
