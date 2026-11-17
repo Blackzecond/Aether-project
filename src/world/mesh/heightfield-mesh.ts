@@ -21,9 +21,10 @@ export function buildHeightfieldMesh(field: Heightfield, verticalScale = 1): Ter
     const up = values[Math.max(0, z - 1) * width + x], down = values[Math.min(height - 1, z + 1) * width + x];
     const dx = (right - left) / (x === 0 || x === width - 1 ? (bounds.maxX - bounds.minX) / (width - 1) : 2 * (bounds.maxX - bounds.minX) / (width - 1));
     const dz = (down - up) / (z === 0 || z === height - 1 ? (bounds.maxZ - bounds.minZ) / (height - 1) : 2 * (bounds.maxZ - bounds.minZ) / (height - 1));
-    const length = Math.hypot(dx, 1, dz);
+    const normalX = -dx / verticalScale, normalY = 1, normalZ = -dz / verticalScale;
+    const length = Math.hypot(normalX, normalY, normalZ);
     positions[p] = wx; positions[p + 1] = values[i] * verticalScale; positions[p + 2] = wz;
-    normals[p] = -dx / length; normals[p + 1] = 1 / length; normals[p + 2] = -dz / length;
+    normals[p] = normalX / length; normals[p + 1] = normalY / length; normals[p + 2] = normalZ / length;
   }
   const indices = new Uint32Array((width - 1) * (height - 1) * 6);
   let cursor = 0;
