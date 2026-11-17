@@ -4,10 +4,6 @@ import { DEFAULT_WORLD_BOUNDS } from "../coordinates";
 import { validateTerrainRecipe, type TerrainRecipe } from "../recipe";
 import { fbmGradient2 } from "./noise";
 const clamp = (v: number, min: number, max: number): number => Math.max(min, Math.min(max, v));
-const smoothMax = (a: number, b: number, k: number): number => {
-  const h = Math.max(k - Math.abs(a - b), 0) / k;
-  return Math.max(a, b) + h * h * k * 0.25;
-};
 function ridgeField(x: number, z: number, seed: number, spacing: number, irregularity: number, sharpness: number): number {
   const warpX = fbmGradient2(x * 1.7, z * 1.7, seed + 71, 3) * irregularity * 0.13;
   const warpZ = fbmGradient2(x * 1.7, z * 1.7, seed + 97, 3) * irregularity * 0.13;
