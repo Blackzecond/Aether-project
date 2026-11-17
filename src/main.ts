@@ -169,7 +169,6 @@ wireLayer.setAttribute("aria-hidden", "true");
 graphStage.append(wireLayer); graphViewport.append(graphStage);
 let viewX = 0, viewY = 0, viewScale = 0.6;
 let gesture: { kind: "pan" | "node" | "wire"; pointerId: number; sx: number; sy: number; ox: number; oy: number; id?: string; fromNodeId?: string; fromPort?: string } | null = null;
-let suppressGraphClick = false;
 function nodePosition(id: string, index: number) { return graphState.layout?.[id] ?? { x: 60 + (index % 3) * 340, y: 60 + Math.floor(index / 3) * 250 }; }
 function drawGraphWires(): void {
   wireLayer.setAttribute("viewBox", "0 0 1500 1200"); wireLayer.setAttribute("width", "1500"); wireLayer.setAttribute("height", "1200"); wireLayer.replaceChildren();
@@ -276,7 +275,6 @@ for (const input of [seedInput, scaleInput, roughnessInput, detailInput]) {
 }
 
 graphStage.addEventListener("click", (event) => {
-  if (suppressGraphClick) { suppressGraphClick = false; return; }
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
   const button = target.closest<HTMLButtonElement>("button[data-action]");
@@ -500,7 +498,6 @@ function endGraphGesture(event: PointerEvent): void {
     const fromNodeId = gesture.fromNodeId, fromPort = gesture.fromPort;
     const hit = document.elementFromPoint(event.clientX, event.clientY);
     const input = hit instanceof Element ? hit.closest<HTMLButtonElement>('button[data-action="connect-input"]') : null;
-    suppressGraphClick = true;
     if (fromNodeId && fromPort && input?.dataset.nodeId && input.dataset.port) {
       const toNodeId = input.dataset.nodeId, toPort = input.dataset.port;
       if (fromNodeId === toNodeId) graphStatus.textContent = "ไม่สามารถเชื่อม Node เข้าหาตัวเองได้";
