@@ -50,6 +50,7 @@ const registry = new Map(createCoreNodeRegistry());
 registry.set(outputDefinition.type, outputDefinition);
 
 const STORAGE_KEY = "aether.graph.v2";
+const LEGACY_STORAGE_KEY = "aether.graph.v1";
 const DEFAULT_NODE_IDS = new Set(["scale", "roughness", "detail", "landscape"]);
 
 function createDefaultGraph(): GraphDocument {
@@ -60,7 +61,7 @@ function createDefaultGraph(): GraphDocument {
       { id: "detail", type: "number.constant", params: { value: Number(detailInput.value) } },
       { id: "landscape", type: "landscape.compose" },
     ],
-    layout: { scale: { x: 70, y: 70 }, roughness: { x: 70, y: 300 }, detail: { x: 70, y: 530 }, landscape: { x: 650, y: 260 } },
+    layout: { scale: { x: 40, y: 40 }, roughness: { x: 330, y: 40 }, detail: { x: 40, y: 320 }, landscape: { x: 330, y: 320 } },
     edges: [
       { id: "e-scale", fromNodeId: "scale", fromPort: "value", toNodeId: "landscape", toPort: "scale" },
       { id: "e-roughness", fromNodeId: "roughness", fromPort: "value", toNodeId: "landscape", toPort: "roughness" },
@@ -71,7 +72,7 @@ function createDefaultGraph(): GraphDocument {
 
 function restoreGraph(): GraphDocument {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
     if (!saved) return createDefaultGraph();
     const restored = parseGraphDocument(saved);
     if (!restored.nodes.some((node) => node.id === "landscape" && node.type === "landscape.compose")) {
@@ -166,7 +167,7 @@ const wireLayer = document.createElementNS("http://www.w3.org/2000/svg", "svg");
 wireLayer.classList.add("graph-wires");
 wireLayer.setAttribute("aria-hidden", "true");
 graphStage.append(wireLayer); graphViewport.append(graphStage);
-let viewX = 0, viewY = 0, viewScale = 0.78;
+let viewX = 0, viewY = 0, viewScale = 0.6;
 let gesture: { kind: "pan" | "node"; pointerId: number; sx: number; sy: number; ox: number; oy: number; id?: string } | null = null;
 function nodePosition(id: string, index: number) { return graphState.layout?.[id] ?? { x: 60 + (index % 3) * 340, y: 60 + Math.floor(index / 3) * 250 }; }
 function drawGraphWires(): void {
@@ -437,7 +438,7 @@ graphFileInput.addEventListener("change", async () => {
 
 requiredElement<HTMLButtonElement>("#reset-graph").addEventListener("click", () => {
   graphState = createDefaultGraph();
-  viewX = 0; viewY = 0; viewScale = 0.78;
+  viewX = 0; viewY = 0; viewScale = 0.6;
   selectedOutput = null;
   syncControlsFromGraph();
   saveGraph();
@@ -477,7 +478,7 @@ graphViewport.addEventListener("wheel", (event) => { event.preventDefault(); con
   viewX = px - (px-viewX)*ratio; viewY = py - (py-viewY)*ratio; viewScale = next; applyGraphView(); }, { passive: false });
 requiredElement<HTMLButtonElement>("#graph-zoom-in").addEventListener("click", () => { viewScale = Math.min(1.5, viewScale*1.15); applyGraphView(); });
 requiredElement<HTMLButtonElement>("#graph-zoom-out").addEventListener("click", () => { viewScale = Math.max(0.35, viewScale/1.15); applyGraphView(); });
-requiredElement<HTMLButtonElement>("#graph-zoom-reset").addEventListener("click", () => { viewX=0; viewY=0; viewScale=0.78; applyGraphView(); });
+requiredElement<HTMLButtonElement>("#graph-zoom-reset").addEventListener("click", () => { viewX=0; viewY=0; viewScale=0.6; applyGraphView(); });
 renderGraphEditor();
 const observer = new ResizeObserver(() => { scheduleRender(); drawGraphWires(); });
 observer.observe(canvas);
