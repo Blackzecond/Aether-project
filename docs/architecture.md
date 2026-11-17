@@ -8,6 +8,8 @@ The world model is authoritative. Rendering consumes world data; it must not inv
 
 `TerrainRecipe → generateTerrain() → Heightfield → surface sampling / mesh → WebGL2 renderer`
 
+Hydrology is a separate derived stage: `Heightfield → buildDrainageField() → filled elevation + D8 flow + accumulation + basin labels`. Depression filling never mutates the source terrain and is not used as rendered elevation.
+
 - `src/world/coordinates.ts`: canonical world-space bounds and coordinate contracts.
 - `src/world/recipe.ts`: versioned, validated generation parameters.
 - `src/world/terrain/noise.ts`: deterministic gradient noise and fBm.
