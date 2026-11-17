@@ -136,8 +136,8 @@ function buildTreeGeometry(): Float32Array {
     let nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;const len=Math.hypot(nx,ny,nz)||1;nx/=len;ny/=len;nz/=len;
     for(const p of [a,b,d])out.push(p[0],p[1],p[2],nx,ny,nz);
   };
-  const cone=(bottom:number,top:number,radius:number,segments=7) => {const apex=[0,top,0];for(let i=0;i<segments;i++){const a=i/segments*Math.PI*2,b=(i+1)/segments*Math.PI*2;tri([Math.cos(a)*radius,bottom,Math.sin(a)*radius],[Math.cos(b)*radius,bottom,Math.sin(b)*radius],apex);}};
-  const cylinder=(bottom:number,top:number,radius:number,segments=6) => {for(let i=0;i<segments;i++){const a=i/segments*Math.PI*2,b=(i+1)/segments*Math.PI*2,p1=[Math.cos(a)*radius,bottom,Math.sin(a)*radius],p2=[Math.cos(b)*radius,bottom,Math.sin(b)*radius],p3=[Math.cos(a)*radius,top,Math.sin(a)*radius],p4=[Math.cos(b)*radius,top,Math.sin(b)*radius];tri(p1,p2,p3);tri(p2,p4,p3);}};
+  const cone=(bottom:number,top:number,radius:number,segments=7) => {const apex=[0,top,0];for(let i=0;i<segments;i++){const a=i/segments*Math.PI*2,b=(i+1)/segments*Math.PI*2;tri([Math.cos(a)*radius,bottom,Math.sin(a)*radius],apex,[Math.cos(b)*radius,bottom,Math.sin(b)*radius]);}};
+  const cylinder=(bottom:number,top:number,radius:number,segments=6) => {for(let i=0;i<segments;i++){const a=i/segments*Math.PI*2,b=(i+1)/segments*Math.PI*2,p1=[Math.cos(a)*radius,bottom,Math.sin(a)*radius],p2=[Math.cos(b)*radius,bottom,Math.sin(b)*radius],p3=[Math.cos(a)*radius,top,Math.sin(a)*radius],p4=[Math.cos(b)*radius,top,Math.sin(b)*radius];tri(p1,p3,p2);tri(p2,p3,p4);}};
   cylinder(0,0.39,0.045);cone(0.18,0.60,0.25);cone(0.37,0.81,0.19);cone(0.56,1,0.125);
   return new Float32Array(out);
 }
