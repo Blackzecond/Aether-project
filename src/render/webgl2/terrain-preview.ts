@@ -194,7 +194,7 @@ export class TerrainPreviewRenderer {
   private lineCount = 0;
   private mode: TerrainViewMode = "world";
   private azimuth = 0.76;
-  private elevation = 0.42;
+  private elevation = 0.24;
   private distance = 4.35;
   private fitDistance = 4.35;
   private cameraTarget = [0, 0.34, 0];
@@ -284,7 +284,7 @@ export class TerrainPreviewRenderer {
       this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
       if (this.pointers.size >= 2) {
         const nextPinch = this.pinchDistance();
-        if (this.previousPinch > 0 && nextPinch > 0) this.distance = Math.max(this.fitDistance * 0.58, Math.min(this.fitDistance * 2.2, this.distance * this.previousPinch / nextPinch));
+        if (this.previousPinch > 0 && nextPinch > 0) this.distance = Math.max(this.fitDistance * 0.28, Math.min(this.fitDistance * 2.2, this.distance * this.previousPinch / nextPinch));
         this.previousPinch = nextPinch;
       } else {
         this.azimuth -= dx * 0.008;
@@ -301,7 +301,7 @@ export class TerrainPreviewRenderer {
     this.canvas.addEventListener("lostpointercapture", release);
     this.canvas.addEventListener("wheel", event => {
       event.preventDefault();
-      this.distance = Math.max(this.fitDistance * 0.58, Math.min(this.fitDistance * 2.2, this.distance * Math.exp(event.deltaY * 0.001)));
+      this.distance = Math.max(this.fitDistance * 0.28, Math.min(this.fitDistance * 2.2, this.distance * Math.exp(event.deltaY * 0.001)));
       this.render();
     }, { passive: false });
   }
@@ -314,8 +314,8 @@ export class TerrainPreviewRenderer {
 
   resetCamera(): void {
     this.azimuth = 0.76;
-    this.elevation = 0.42;
-    this.distance = this.fitDistance * 0.82;
+    this.elevation = 0.24;
+    this.distance = this.fitDistance * 0.46;
     this.render();
   }
 
@@ -338,7 +338,7 @@ export class TerrainPreviewRenderer {
     const maxY = maxHeight * 1.18;
     this.cameraTarget = [
       (field.bounds.minX + field.bounds.maxX) * 0.5,
-      (baseY + maxY) * 0.5,
+      baseY + (maxY - baseY) * 0.32,
       (field.bounds.minZ + field.bounds.maxZ) * 0.5,
     ];
     this.cameraRadius = Math.hypot(
@@ -346,9 +346,9 @@ export class TerrainPreviewRenderer {
       (maxY - baseY) * 0.5,
       (field.bounds.maxZ - field.bounds.minZ) * 0.5,
     );
-    const zoomRatio = this.triangleCount > 0 ? this.distance / this.fitDistance : 0.82;
+    const zoomRatio = this.triangleCount > 0 ? this.distance / this.fitDistance : 0.46;
     this.updateCameraFit();
-    this.distance = Math.max(this.fitDistance * 0.58, Math.min(this.fitDistance * 2.2, this.fitDistance * zoomRatio));
+    this.distance = Math.max(this.fitDistance * 0.28, Math.min(this.fitDistance * 2.2, this.fitDistance * zoomRatio));
     const lines = new Uint32Array((field.width - 1) * field.height * 2 + (field.height - 1) * field.width * 2);
     let cursor = 0;
     for (let z = 0; z < field.height; z += 1) {
