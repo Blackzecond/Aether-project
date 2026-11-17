@@ -1,5 +1,5 @@
 import { DEFAULT_TERRAIN_RECIPE, createHeightfield, buildDrainageField, extractRiverNetwork, generateVegetation, type TerrainRecipe } from "./world";
-import type { VolumeMesh, VolumeMeshChunk, VolumeMeshLod } from "./world/volume/density-world";
+import type { VolumeMesh, VolumeMeshChunk } from "./world/volume/density-world";
 import { TerrainPreviewRenderer, type TerrainViewMode } from "./render/webgl2/terrain-preview";
 const canvas=document.querySelector<HTMLCanvasElement>("#terrain-canvas")!;
 const status=document.querySelector<HTMLElement>("#lab-status")!;
@@ -20,7 +20,8 @@ interface DensityWorkerMessage {
   readonly error?:string;
   readonly heightfield?:{readonly width:number;readonly height:number;readonly bounds:TerrainRecipe["bounds"] extends infer B?NonNullable<B>:never;readonly values:ArrayBuffer};
   readonly mesh?:{readonly positions:ArrayBuffer;readonly normals:ArrayBuffer;readonly indices:ArrayBuffer;readonly vertexCount:number;readonly triangleCount:number;readonly chunks:readonly VolumeMeshChunk[];readonly lods:readonly {readonly positions:ArrayBuffer;readonly normals:ArrayBuffer;readonly indices:ArrayBuffer;readonly vertexCount:number;readonly triangleCount:number;readonly chunks:readonly VolumeMeshChunk[]}[]};
-  readonly diagnostics?:{readonly samples:number;readonly vertices:number;readonly triangles:number;readonly occupiedSamples:number};\n  readonly backend?:"webgpu"|"cpu";
+  readonly diagnostics?:{readonly samples:number;readonly vertices:number;readonly triangles:number;readonly occupiedSamples:number};
+  readonly backend?:"webgpu"|"cpu";
 }
 const densityWorker=new Worker(new URL("./world/volume/density-worker.ts",import.meta.url),{type:"module"});
 const device=navigator as Navigator&{deviceMemory?:number};
@@ -45,7 +46,8 @@ function finishRender(message:DensityWorkerMessage):void{
       positions:new Float32Array(message.mesh.positions),
       normals:new Float32Array(message.mesh.normals),
       indices:new Uint32Array(message.mesh.indices),
-      vertexCount:message.mesh.vertexCount,triangleCount:message.mesh.triangleCount,chunks:message.mesh.chunks,\n      lods:message.mesh.lods.map(lod=>({positions:new Float32Array(lod.positions),normals:new Float32Array(lod.normals),indices:new Uint32Array(lod.indices),vertexCount:lod.vertexCount,triangleCount:lod.triangleCount,chunks:lod.chunks})),
+      vertexCount:message.mesh.vertexCount,triangleCount:message.mesh.triangleCount,chunks:message.mesh.chunks,
+      lods:message.mesh.lods.map(lod=>({positions:new Float32Array(lod.positions),normals:new Float32Array(lod.normals),indices:new Uint32Array(lod.indices),vertexCount:lod.vertexCount,triangleCount:lod.triangleCount,chunks:lod.chunks})),
     };
     renderer.setVolumeTerrain(field,mesh);
     const mode=document.querySelector<HTMLSelectElement>("#debug-mode")!.value as TerrainViewMode;
