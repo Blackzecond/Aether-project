@@ -152,7 +152,7 @@ export function buildDrainageField(field: Heightfield): DrainageField {
         const nz = z + dz;
         if (nx < 0 || nz < 0 || nx >= width || nz >= height) continue;
         const next = nz * width + nx;
-        if (floodOrder[next] >= floodOrder[index]) continue;
+        if (floodOrder[next] >= floodOrder[index] || filledElevation[next] > filledElevation[index]) continue;
         const distance = Math.hypot(dx * cellSizeX, dz * cellSizeZ);
         const drop = filledElevation[index] - filledElevation[next];
         const slope = drop > 0 ? drop / distance : 0;
