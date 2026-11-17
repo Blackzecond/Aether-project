@@ -1,37 +1,40 @@
-# Aether Project
+# Aether — Procedural World Generator
 
-A lightweight, procedural-first creation studio for 2D, 2.5D and 3D work.
+Aether is being rebuilt around a shared world-space model. Terrain is the authoritative foundation: every later system (water, vegetation, atmosphere, lighting) will derive from the same sampled world rather than drawing independent screen-space layers.
 
-Aether prioritizes deterministic generation, reusable rules, low memory use and a mobile-aware preview. It starts with a small 2D procedural playground before adding heavier rendering capabilities.
+## Current foundation
 
-## Principles
+- Canonical X/Y/Z world coordinates and validated, versioned terrain recipes
+- Deterministic seeded gradient noise and fBm
+- 2D heightfield sampling with bilinear elevation, finite-difference normals, slope and curvature
+- Indexed heightfield mesh with per-vertex normals
+- WebGL2 terrain renderer with shaded, elevation, slope, normal and wireframe diagnostic views
+- Terrain controls update the generated world immediately
+- Automated tests for determinism, parameter response, surface sampling and mesh integrity
 
-- Procedural-first: generate from rules, parameters and seeds.
-- Mobile-aware: adaptive quality, bounded workloads and no unnecessary per-frame work.
-- Small core: avoid runtime dependencies until a measured need exists.
-- Reproducible: the same graph, parameters and seed produce the same output.
-- Incremental: only recompute graph nodes affected by a change.
-- Progressive rendering: preview cheaply; spend more work only for final output.
-
-## Current status
-
-**Phase 0 — Foundation:** repository initialized; architecture and first 2D prototype are being prepared.
-
-## Development
-
-Requirements: Node.js 20+
+## Run locally
 
 ```bash
 npm install
 npm run dev
+```
+
+Open the root page. The production entry point is `index.html`.
+
+## Checks
+
+```bash
+npm test
 npm run typecheck
 npm run build
 ```
 
-## Research reference
+## Development sequence
 
-Aether studies the techniques used by [Abyssal Garden](https://github.com/Noniv/abyssal-garden), but does not copy its implementation wholesale. See [the technical study](docs/research/abyssal-garden.md) for the design decisions and proposed improvements.
+1. Accept and validate the terrain shape and controls.
+2. Derive drainage and water flow from terrain.
+3. Derive biome and vegetation suitability from terrain and hydrology.
+4. Add atmosphere, lighting and depth-aware rendering.
+5. Optimize quality levels and mobile performance.
 
-## License
-
-MIT
+Do not add independent screen-space scenery layers. New systems must query the shared world model.
