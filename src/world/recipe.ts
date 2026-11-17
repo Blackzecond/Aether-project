@@ -18,8 +18,8 @@ export interface TerrainRecipe {
 export const DEFAULT_TERRAIN_RECIPE: TerrainRecipe = Object.freeze({
   version: 1, seed: 18273, width: 128, height: 128,
   landform: {
-    mountainSpacing: 0.72, relief: 0.72, peakSharpness: 0.58,
-    ridgeIrregularity: 0.32, roughness: 0.16, detailScale: 5.5, detailOctaves: 4,
+    mountainSpacing: 1.0, relief: 0.8, peakSharpness: 0.38,
+    ridgeIrregularity: 0.32, roughness: 0.1, detailScale: 3.2, detailOctaves: 3,
   },
 });
 export function validateTerrainRecipe(recipe: TerrainRecipe): void {
@@ -30,13 +30,13 @@ export function validateTerrainRecipe(recipe: TerrainRecipe): void {
   }
   if (!Number.isFinite(recipe.seed)) throw new Error("Seed must be finite");
   const ranges: Array<[number, number, number, string]> = [
-    [landform.mountainSpacing, 0.2, 2.5, "mountainSpacing"],
-    [landform.relief, 0.05, 1.5, "relief"],
-    [landform.peakSharpness, 0, 1, "peakSharpness"],
-    [landform.ridgeIrregularity, 0, 1, "ridgeIrregularity"],
-    [landform.roughness, 0, 0.6, "roughness"],
-    [landform.detailScale, 1, 16, "detailScale"],
-    [landform.detailOctaves, 1, 7, "detailOctaves"],
+    [landform.mountainSpacing, 0.65, 1.8, "mountainSpacing"],
+    [landform.relief, 0.35, 1.1, "relief"],
+    [landform.peakSharpness, 0.15, 0.7, "peakSharpness"],
+    [landform.ridgeIrregularity, 0, 0.75, "ridgeIrregularity"],
+    [landform.roughness, 0, 0.28, "roughness"],
+    [landform.detailScale, 1, 5, "detailScale"],
+    [landform.detailOctaves, 1, 4, "detailOctaves"],
   ];
   for (const [value, min, max, name] of ranges) {
     if (!Number.isFinite(value) || value < min || value > max) throw new Error(`Invalid terrain parameter: ${name}`);
