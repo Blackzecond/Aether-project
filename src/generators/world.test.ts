@@ -23,6 +23,8 @@ describe("shared landscape world", () => {
     const world = createLandscapeWorld(640, 360, baseOptions);
     expect(world.river.length).toBeGreaterThan(20);
     expect(world.river[0].width).toBeLessThan(world.river[world.river.length - 1].width);
+    expect(world.river[0].y).toBeLessThan(360 * 0.8);
+    expect(world.river[world.river.length - 1].y).toBeGreaterThan(360);
     expect(world.river[world.river.length - 1].y).toBeGreaterThan(world.river[0].y);
   });
 
