@@ -92,6 +92,10 @@ input[type="range"] { display: block; width: 100%; height: 28px; margin: 0; acce
 .remove-node { padding: 5px 8px; border: 1px solid var(--line); border-radius: 7px; background: transparent; color: #b6c4b9; font-size: 9px; }
 .node-param-label { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 8px 0; color: #aebeb1; font-size: 10px; }
 .node-param-input { width: 112px; height: 34px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: #101b17; color: #e8eee9; font-size: 12px; }
+.node-result { display: grid; gap: 5px; margin-top: 9px; padding-top: 8px; border-top: 1px solid rgba(184, 210, 190, .12); }
+.node-result-label { color: #82998a; font-size: 8px; letter-spacing: .06em; }
+.node-result-values { display: flex; flex-wrap: wrap; gap: 5px; }
+.node-result-chip { padding: 4px 6px; border: 1px solid rgba(174, 210, 180, .16); border-radius: 6px; background: #14221b; color: #c9dfcb; font-size: 9px; font-variant-numeric: tabular-nums; }
 .node-ports { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 9px; }
 .port-group { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
 .port-heading { color: #839a89; font-size: 8px; letter-spacing: .1em; }
