@@ -59,10 +59,10 @@ export function generateVegetation(
   });
 
   // Trees form clustered woodland patches rather than a sparse uniform scatter.
-  for (let gz = 2; gz < field.height - 2; gz += 3) {
-    for (let gx = 2; gx < field.width - 2; gx += 3) {
+  for (let gz = 2; gz < field.height - 2; gz += 1) {
+    for (let gx = 2; gx < field.width - 2; gx += 1) {
       const patch = hash(seed + 17, Math.floor(gx / 10), Math.floor(gz / 10));
-      if (hash(seed, gx, gz) > (patch > 0.24 ? 0.84 : 0.035)) continue;
+      if (hash(seed, gx, gz) > (patch > 0.16 ? 0.46 : 0.12)) continue;
       const jitterX = (hash(seed + 31, gx, gz) - 0.5) * 1.45;
       const jitterZ = (hash(seed + 47, gx, gz) - 0.5) * 1.45;
       const gridX = Math.max(1, Math.min(field.width - 2, gx + jitterX));
@@ -72,11 +72,11 @@ export function generateVegetation(
       const surface = sampleSurface(field, x, z);
       if (surface.elevation < 0.035 || surface.elevation > 0.92 || surface.slope > 0.72) continue;
       const nearWater = waterInfluence[Math.round(gridZ) * field.width + Math.round(gridX)] > 0;
-      const density = nearWater ? 0.94 : 0.78;
+      const density = nearWater ? 0.98 : 0.93;
       if (hash(seed + 71, gx, gz) > density) continue;
       instances.push({
         x, y: surface.elevation + 0.00035, z,
-        height: 0.009 + hash(seed + 83, gx, gz) * 0.010,
+        height: 0.016 + hash(seed + 83, gx, gz) * 0.014,
         tint: hash(seed + 97, gx, gz),
       });
       if (instances.length >= 6000) break;
@@ -98,7 +98,7 @@ export function generateVegetation(
       const nearWater = waterInfluence[Math.round(gridZ) * field.width + Math.round(gridX)] > 0;
       const roll = hash(seed + 167, gx, gz);
       const patch = hash(seed + 173, Math.floor(gx / 9), Math.floor(gz / 9));
-      if (roll > (patch > 0.18 ? 0.72 : 0.24)) continue;
+      if (roll > (patch > 0.14 ? 0.88 : 0.48)) continue;
 
       let kind: GroundCoverInstance["kind"];
       if (surface.slope > 0.72 && roll > 0.42) kind = 3; // exposed stones
@@ -108,12 +108,12 @@ export function generateVegetation(
       else kind = patch > 0.5 ? 1 : 0;
 
       const scale = kind === 3
-        ? 0.0012 + hash(seed + 181, gx, gz) * 0.0026
+        ? 0.0018 + hash(seed + 181, gx, gz) * 0.0028
         : kind === 2
-          ? 0.0005 + hash(seed + 181, gx, gz) * 0.0007
+          ? 0.0009 + hash(seed + 181, gx, gz) * 0.0010
           : kind === 1
-            ? 0.0014 + hash(seed + 181, gx, gz) * 0.0014
-            : 0.00035 + hash(seed + 181, gx, gz) * 0.0005;
+            ? 0.0024 + hash(seed + 181, gx, gz) * 0.0022
+            : 0.0010 + hash(seed + 181, gx, gz) * 0.0010;
       groundCover.push({
         x, y: surface.elevation + 0.0002, z, scale,
         tint: hash(seed + 193, gx, gz), kind,
