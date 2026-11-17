@@ -3,7 +3,17 @@ import type { Heightfield } from "../../world/fields/heightfield";
 import type { DrainageField } from "../../world/hydrology/drainage";
 import type { RiverNetwork } from "../../world/hydrology/rivers";
 
-export type TerrainViewMode = "shaded" | "elevation" | "slope" | "normals" | "wireframe" | "hydrology";
+export type TerrainViewMode = "world" | "shaded" | "elevation" | "slope" | "normals" | "wireframe" | "hydrology";
+
+const waterVertexSource = `#version 300 es
+precision highp float;
+layout(location=0) in vec3 aPosition;
+uniform mat4 uMvp;
+void main(){ gl_Position=uMvp*vec4(aPosition,1.0); }`;
+const waterFragmentSource = `#version 300 es
+precision highp float;
+out vec4 outColor;
+void main(){ outColor=vec4(0.055,0.34,0.43,0.94); }`;
 
 const vertexSource = `#version 300 es
 precision highp float;
@@ -160,7 +170,7 @@ function multiply(a: Float32Array, b: Float32Array): Float32Array {
   return out;
 }
 
-const MODE: Record<TerrainViewMode, number> = { shaded: 0, elevation: 1, slope: 2, normals: 3, wireframe: 4, hydrology: 5 };
+const MODE: Record<TerrainViewMode, number> = { world: 0, shaded: 0, elevation: 1, slope: 2, normals: 3, wireframe: 4, hydrology: 5 };
 
 export class TerrainPreviewRenderer {
   private readonly gl: WebGL2RenderingContext;
@@ -171,7 +181,7 @@ export class TerrainPreviewRenderer {
   private readonly indexBuffer: WebGLBuffer;
   private readonly lineBuffer: WebGLBuffer;
   private readonly accumulationBuffer: WebGLBuffer;
-  private readonly channelBuffer: WebGLBuffer;
+  private readonly channelBuffer: WebGLBuffer;\n  private readonly waterProgram: WebGLProgram;\n  private readonly waterVao: WebGLVertexArrayObject;\n  private readonly waterBuffer: WebGLBuffer;\n  private readonly waterMvpLocation: WebGLUniformLocation;\n  private waterVertexCount = 0;
   private maximumAccumulation = 1;
   private vertexCount = 0;
   private surfaceVertexCount = 0;
@@ -196,7 +206,7 @@ export class TerrainPreviewRenderer {
     const gl = canvas.getContext("webgl2", { antialias: true, alpha: false, powerPreference: "low-power" });
     if (!gl) throw new Error("อุปกรณ์หรือเบราว์เซอร์นี้ไม่รองรับ WebGL2");
     this.gl = gl;
-    this.program = createProgram(gl);
+    this.program = createProgram(gl);\n    const waterVs=compile(gl,gl.VERTEX_SHADER,waterVertexSource);\n    const waterFs=compile(gl,gl.FRAGMENT_SHADER,waterFragmentSource);\n    const waterProgram=gl.createProgram();\n    if(!waterProgram) throw new Error("ไม่สามารถสร้าง Water Program ได้");\n    gl.attachShader(waterProgram,waterVs);gl.attachShader(waterProgram,waterFs);gl.linkProgram(waterProgram);gl.deleteShader(waterVs);gl.deleteShader(waterFs);\n    if(!gl.getProgramParameter(waterProgram,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(waterProgram)??"Water program link failed");\n    this.waterProgram=waterProgram;\n    const waterVao=gl.createVertexArray(),waterBuffer=gl.createBuffer();\n    if(!waterVao||!waterBuffer) throw new Error("ไม่สามารถจองหน่วยความจำผิวน้ำได้");\n    this.waterVao=waterVao;this.waterBuffer=waterBuffer;\n    this.waterMvpLocation=gl.getUniformLocation(waterProgram,"uMvp")!;\n    gl.bindVertexArray(waterVao);gl.bindBuffer(gl.ARRAY_BUFFER,waterBuffer);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);gl.bindVertexArray(null);
 
     const vao = gl.createVertexArray();
     const position = gl.createBuffer();
@@ -292,7 +302,7 @@ export class TerrainPreviewRenderer {
     this.render();
   }
 
-  setMode(mode: TerrainViewMode): void { this.mode = mode; }
+  setMode(mode: TerrainViewMode): void { this.mode = mode; this.render(); }
 
   setTerrain(field: Heightfield): void {
     const gl = this.gl;
@@ -359,7 +369,7 @@ export class TerrainPreviewRenderer {
     this.render();
   }
 
-  setHydrology(drainage: DrainageField, rivers: RiverNetwork): void {
+  setHydrology(field: Heightfield, drainage: DrainageField, rivers: RiverNetwork): void {
     if (drainage.accumulation.length !== this.surfaceVertexCount || rivers.channelMask.length !== this.surfaceVertexCount) {
       throw new Error("Hydrology data does not match the terrain mesh");
     }
@@ -369,7 +379,7 @@ export class TerrainPreviewRenderer {
       accumulation[i] = drainage.accumulation[i];
       channels[i] = rivers.channelMask[i];
     }
-    this.maximumAccumulation = Math.max(1, drainage.diagnostics.maximumAccumulation);
+    this.maximumAccumulation = Math.max(1, drainage.diagnostics.maximumAccumulation);\n    const water:number[]=[];\n    const px=(index:number)=>field.bounds.minX+(index%field.width)/(field.width-1)*(field.bounds.maxX-field.bounds.minX);\n    const pz=(index:number)=>field.bounds.minZ+Math.floor(index/field.width)/(field.height-1)*(field.bounds.maxZ-field.bounds.minZ);\n    const py=(index:number)=>field.values[index]*1.18+0.014;\n    for(const index of rivers.channelIndices){\n      const next=rivers.downstream[index];if(next<0)continue;\n      const ax=px(index),az=pz(index),bx=px(next),bz=pz(next);\n      const dx=bx-ax,dz=bz-az,len=Math.hypot(dx,dz)||1;\n      const nx=-dz/len,nz=dx/len;\n      const wa=Math.max(rivers.width[index]*0.5,0.0015),wb=Math.max(rivers.width[next]*0.5,0.0015);\n      const aL=[ax+nx*wa,py(index),az+nz*wa],aR=[ax-nx*wa,py(index),az-nz*wa];\n      const bL=[bx+nx*wb,py(next),bz+nz*wb],bR=[bx-nx*wb,py(next),bz-nz*wb];\n      water.push(...aL,...aR,...bL,...aR,...bR,...bL);\n    }\n    this.waterVertexCount=water.length/3;\n    gl.bindBuffer(gl.ARRAY_BUFFER,this.waterBuffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(water),gl.DYNAMIC_DRAW);
     const gl = this.gl;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.accumulationBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, accumulation, gl.DYNAMIC_DRAW);
@@ -449,6 +459,6 @@ export class TerrainPreviewRenderer {
     gl.deleteBuffer(this.accumulationBuffer);
     gl.deleteBuffer(this.channelBuffer);
     gl.deleteVertexArray(this.vao);
-    gl.deleteProgram(this.program);
+    gl.deleteProgram(this.program);\n    gl.deleteBuffer(this.waterBuffer);gl.deleteVertexArray(this.waterVao);gl.deleteProgram(this.waterProgram);
   }
 }
