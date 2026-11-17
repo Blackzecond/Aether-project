@@ -132,12 +132,15 @@ export function serializeGraphDocument(graph: GraphDocument): string {
     edges: graph.edges,
   });
   try {
-    return JSON.stringify({
+    const source = JSON.stringify({
       version: GRAPH_DOCUMENT_VERSION,
       nodes: normalized.nodes,
       edges: normalized.edges,
     }, null, 2);
-  } catch {
+    if (source === undefined) throw new GraphDocumentFormatError("Graph document could not be serialized.");
+    return source;
+  } catch (error) {
+    if (error instanceof GraphDocumentFormatError) throw error;
     throw new GraphDocumentFormatError("Graph document could not be serialized.");
   }
 }
