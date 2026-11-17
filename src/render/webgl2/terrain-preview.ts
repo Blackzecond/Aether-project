@@ -161,6 +161,7 @@ export class TerrainPreviewRenderer {
   private distance = 4.35;
   private fitDistance = 4.35;
   private cameraTarget = [0, 0.34, 0];
+  private cameraRadius = 1.8;
   private readonly mvpLocation: WebGLUniformLocation;
   private readonly modelLocation: WebGLUniformLocation;
   private readonly modeLocation: WebGLUniformLocation;
@@ -275,18 +276,14 @@ export class TerrainPreviewRenderer {
       (baseY + maxY) * 0.5,
       (field.bounds.minZ + field.bounds.maxZ) * 0.5,
     ];
-    const rect = this.canvas.getBoundingClientRect();
-    const aspect = rect.width / Math.max(1, rect.height);
-    const verticalFov = 0.72;
-    const horizontalFov = 2 * Math.atan(Math.tan(verticalFov * 0.5) * aspect);
-    const limitingFov = Math.min(verticalFov, horizontalFov);
-    const radius = Math.hypot(
+    this.cameraRadius = Math.hypot(
       (field.bounds.maxX - field.bounds.minX) * 0.5,
       (maxY - baseY) * 0.5,
       (field.bounds.maxZ - field.bounds.minZ) * 0.5,
     );
-    this.fitDistance = Math.max(2.4, Math.min(8, radius / Math.sin(limitingFov * 0.5) * 1.12));
-    this.distance = this.fitDistance;
+    const zoomRatio = this.triangleCount > 0 ? this.distance / this.fitDistance : 1;
+    this.updateCameraFit();
+    this.distance = Math.max(this.fitDistance * 0.58, Math.min(this.fitDistance * 2.2, this.fitDistance * zoomRatio));
     const lines = new Uint32Array((field.width - 1) * field.height * 2 + (field.height - 1) * field.width * 2);
     let cursor = 0;
     for (let z = 0; z < field.height; z += 1) {
@@ -321,8 +318,20 @@ export class TerrainPreviewRenderer {
     this.render();
   }
 
-  resize(): void {
+  private updateCameraFit(): void {
     const rect = this.canvas.getBoundingClientRect();
+    const aspect = rect.width / Math.max(1, rect.height);
+    const verticalFov = 0.72;
+    const horizontalFov = 2 * Math.atan(Math.tan(verticalFov * 0.5) * aspect);
+    const limitingFov = Math.min(verticalFov, horizontalFov);
+    this.fitDistance = Math.max(2.4, Math.min(8, this.cameraRadius / Math.sin(limitingFov * 0.5) * 1.12));
+  }
+
+  resize(): void {
+    const zoomRatio = this.distance / this.fitDistance;
+    const rect = this.canvas.getBoundingClientRect();
+    this.updateCameraFit();
+    this.distance = Math.max(this.fitDistance * 0.58, Math.min(this.fitDistance * 2.2, this.fitDistance * zoomRatio));
     const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
     const width = Math.max(1, Math.round(rect.width * dpr));
     const height = Math.max(1, Math.round(rect.height * dpr));
