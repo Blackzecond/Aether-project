@@ -343,6 +343,30 @@ function updateBaseNode(id: string, value: number): void {
   if (graphState.nodes.some((node) => node.id === id)) setNodeParam(id, "value", value);
 }
 
+function applyLandscapePreset(name: string): void {
+  const presets: Record<string, { scale: number; roughness: number; detail: number }> = {
+    soft: { scale: 0.8, roughness: 0.3, detail: 3 },
+    rugged: { scale: 1.5, roughness: 0.8, detail: 5 },
+    detailed: { scale: 1.9, roughness: 0.55, detail: 6 },
+  };
+  const preset = presets[name];
+  if (!preset) return;
+  updateBaseNode("scale", preset.scale);
+  updateBaseNode("roughness", preset.roughness);
+  updateBaseNode("detail", preset.detail);
+  syncControlsFromGraph();
+  document.querySelectorAll<HTMLButtonElement>("[data-preset]").forEach((button) => {
+    const active = button.dataset.preset === name;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  saveGraph();
+  scheduleRender();
+}
+document.querySelectorAll<HTMLButtonElement>("[data-preset]").forEach((button) => {
+  button.addEventListener("click", () => applyLandscapePreset(button.dataset.preset ?? ""));
+});
+
 for (const input of [seedInput, scaleInput, roughnessInput, detailInput]) {
   input.addEventListener("input", () => {
     if (input === scaleInput) updateBaseNode("scale", Number(input.value));
