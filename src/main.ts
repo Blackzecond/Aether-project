@@ -296,9 +296,9 @@ for (const input of [seedInput, scaleInput, roughnessInput, detailInput]) {
     if (input === scaleInput) updateBaseNode("scale", Number(input.value));
     if (input === roughnessInput) updateBaseNode("roughness", Number(input.value));
     if (input === detailInput) updateBaseNode("detail", Number(input.value));
-    saveGraph();
     scheduleRender();
   });
+  input.addEventListener("change", saveGraph);
 }
 
 nodeList.addEventListener("click", (event) => {
