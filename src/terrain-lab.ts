@@ -37,9 +37,7 @@ for(const [id,key] of controls){
   });
 }
 document.querySelector<HTMLButtonElement>("#reset-camera")!.addEventListener("click",()=>renderer.resetCamera());
-document.querySelector<HTMLSelectElement>("#debug-mode")!.addEventListener("change",event=>{
-  renderer.setMode((event.currentTarget as HTMLSelectElement).value as TerrainViewMode);renderer.render();
-});
+document.querySelector<HTMLSelectElement>("#debug-mode")!.addEventListener("change",()=>render());
 document.querySelector<HTMLInputElement>("#seed")!.addEventListener("input",event=>{
   recipe={...recipe,seed:Number((event.currentTarget as HTMLInputElement).value)};render();
 });
