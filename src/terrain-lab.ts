@@ -19,10 +19,10 @@ function render(refreshHydrology=true):void {
     const mode=document.querySelector<HTMLSelectElement>("#debug-mode")!.value as TerrainViewMode;renderer.setMode(mode);
     const d=generated.diagnostics;
     let hydrologyMetrics="";
-    if(mode==="hydrology" && refreshHydrology){
+    if((mode==="world" || mode==="hydrology") && refreshHydrology){
       const drainage=buildDrainageField(generated.heightfield);
       const rivers=extractRiverNetwork(generated.heightfield,drainage);
-      renderer.setHydrology(drainage,rivers);
+      renderer.setHydrology(generated.heightfield,drainage,rivers);
       hydrologyMetrics=`<span class="lab-chip">ทางน้ำ ${rivers.diagnostics.channelCellCount.toLocaleString("th-TH")} จุด</span><span class="lab-chip">ต้นน้ำ ${rivers.diagnostics.headwaterCount.toLocaleString("th-TH")}</span><span class="lab-chip">ทางออก ${rivers.diagnostics.outletCount.toLocaleString("th-TH")}</span><span class="lab-chip">สะสมสูงสุด ${drainage.diagnostics.maximumAccumulation.toLocaleString("th-TH")}</span>`;
     }
     renderer.resize();
