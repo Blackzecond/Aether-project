@@ -25,7 +25,7 @@ const detailInput = requiredElement<HTMLInputElement>("#detail");
 const renderStatus = requiredElement<HTMLElement>("#render-status");
 const seedLabel = requiredElement<HTMLElement>("#seed-label");
 const resolutionLabel = requiredElement<HTMLElement>("#resolution-label");
-const nodeList = requiredElement<HTMLDivElement>("#node-list");
+const graphViewport = requiredElement<HTMLDivElement>("#graph-viewport");
 const graphStatus = requiredElement<HTMLElement>("#graph-status");
 const graphMeta = requiredElement<HTMLElement>("#graph-count");
 const nodeTypeSelect = requiredElement<HTMLSelectElement>("#node-type");
@@ -49,7 +49,7 @@ const outputDefinition: GraphNodeDefinition = {
 const registry = new Map(createCoreNodeRegistry());
 registry.set(outputDefinition.type, outputDefinition);
 
-const STORAGE_KEY = "aether.graph.v1";
+const STORAGE_KEY = "aether.graph.v2";
 const DEFAULT_NODE_IDS = new Set(["scale", "roughness", "detail", "landscape"]);
 
 function createDefaultGraph(): GraphDocument {
@@ -60,6 +60,7 @@ function createDefaultGraph(): GraphDocument {
       { id: "detail", type: "number.constant", params: { value: Number(detailInput.value) } },
       { id: "landscape", type: "landscape.compose" },
     ],
+    layout: { scale: { x: 70, y: 70 }, roughness: { x: 70, y: 300 }, detail: { x: 70, y: 530 }, landscape: { x: 650, y: 260 } },
     edges: [
       { id: "e-scale", fromNodeId: "scale", fromPort: "value", toNodeId: "landscape", toPort: "scale" },
       { id: "e-roughness", fromNodeId: "roughness", fromPort: "value", toNodeId: "landscape", toPort: "roughness" },
@@ -159,114 +160,63 @@ const nodeLabels: Record<string, { title: string; category: string }> = {
   "landscape.compose": { title: "Landscape Generator", category: "OUTPUT" },
 };
 
-function renderGraphEditor(): void {
-  nodeList.replaceChildren();
-  graphMeta.textContent = `${graphState.nodes.length} NODES · ${graphState.edges.length} LINKS`;
-
-  for (const node of graphState.nodes) {
-    const definition = registry.get(node.type);
-    if (!definition) continue;
-    const info = nodeLabels[node.type] ?? { title: node.type, category: "NODE" };
-    const card = createElement("article", node.type === "landscape.compose" ? "editor-node output-node" : "editor-node");
-    const nodeIndex = graphState.nodes.findIndex((item) => item.id === node.id);
-    card.dataset.nodeId = node.id;
-
-    const heading = createElement("div", "editor-node-heading");
-    const identity = createElement("div", "editor-node-identity");
-    identity.append(
-      createElement("span", "node-type", info.category),
-      createElement("strong", "editor-node-title", info.title),
-      createElement("span", "node-id", node.id),
-    );
-    heading.append(identity);
-
-    const actions = createElement("div", "node-actions");
-    if (nodeIndex > 0) {
-      const moveUp = createElement("button", "move-node", "↑");
-      moveUp.type = "button";
-      moveUp.dataset.action = "move-node";
-      moveUp.dataset.nodeId = node.id;
-      moveUp.dataset.direction = "-1";
-      moveUp.setAttribute("aria-label", "เลื่อน Node ขึ้น");
-      actions.append(moveUp);
-    }
-    if (nodeIndex < graphState.nodes.length - 1) {
-      const moveDown = createElement("button", "move-node", "↓");
-      moveDown.type = "button";
-      moveDown.dataset.action = "move-node";
-      moveDown.dataset.nodeId = node.id;
-      moveDown.dataset.direction = "1";
-      moveDown.setAttribute("aria-label", "เลื่อน Node ลง");
-      actions.append(moveDown);
-    }
-    if (!DEFAULT_NODE_IDS.has(node.id)) {
-      const remove = createElement("button", "remove-node", "ลบ");
-      remove.type = "button";
-      remove.dataset.action = "remove-node";
-      remove.dataset.nodeId = node.id;
-      remove.setAttribute("aria-label", "ลบ " + info.title);
-      actions.append(remove);
-    }
-    if (actions.childElementCount > 0) heading.append(actions);
-    card.append(heading);
-
-    if (node.type === "number.constant") {
-      const valueLabel = createElement("label", "node-param-label", "ค่า");
-      const valueInput = createElement("input", "node-param-input");
-      valueInput.type = "number";
-      valueInput.step = "any";
-      valueInput.inputMode = "decimal";
-      valueInput.value = String(typeof node.params?.value === "number" ? node.params.value : 0);
-      if (node.id === "scale") { valueInput.min = "0.5"; valueInput.max = "2.4"; valueInput.step = "0.1"; }
-      if (node.id === "roughness") { valueInput.min = "0.15"; valueInput.max = "0.85"; valueInput.step = "0.05"; }
-      if (node.id === "detail") { valueInput.min = "1"; valueInput.max = "6"; valueInput.step = "1"; }
-      valueInput.dataset.nodeId = node.id;
-      valueInput.dataset.param = "value";
-      valueLabel.append(valueInput);
-      card.append(valueLabel);
-    }
-
-    const ports = createElement("div", "node-ports");
-    const inputGroup = createElement("div", "port-group");
-    inputGroup.append(createElement("span", "port-heading", "INPUT"));
-    if (definition.inputs.length === 0) {
-      inputGroup.append(createElement("span", "port-empty", "ไม่มีช่องรับ"));
-    } else {
-      for (const port of definition.inputs) {
-        const connection = graphState.edges.find((edge) => edge.toNodeId === node.id && edge.toPort === port);
-        const sourceName = connection ? graphState.nodes.find((item) => item.id === connection.fromNodeId)?.id : null;
-        const button = createElement("button", "port-button input-port", connection ? `← ${port} · ${sourceName ?? "connected"}` : "← " + port);
-        button.type = "button";
-        button.dataset.action = "connect-input";
-        button.dataset.nodeId = node.id;
-        button.dataset.port = port;
-        inputGroup.append(button);
-      }
-    }
-
-    const outputGroup = createElement("div", "port-group output-group");
-    outputGroup.append(createElement("span", "port-heading", "OUTPUT"));
-    if (definition.outputs.length === 0) {
-      outputGroup.append(createElement("span", "port-empty", "ไม่มีช่องส่ง"));
-    } else {
-      for (const port of definition.outputs) {
-        const button = createElement("button", "port-button output-port", port + " →");
-        button.type = "button";
-        button.dataset.action = "select-output";
-        button.dataset.nodeId = node.id;
-        button.dataset.port = port;
-        if (selectedOutput?.nodeId === node.id && selectedOutput.port === port) {
-          button.classList.add("is-selected");
-        }
-        outputGroup.append(button);
-      }
-    }
-    ports.append(inputGroup, outputGroup);
-    card.append(ports);
-    nodeList.append(card);
+const graphStage = document.createElement("div");
+graphStage.className = "graph-stage";
+const wireLayer = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+wireLayer.classList.add("graph-wires");
+wireLayer.setAttribute("aria-hidden", "true");
+graphStage.append(wireLayer); graphViewport.append(graphStage);
+let viewX = 0, viewY = 0, viewScale = 0.78;
+let gesture: { kind: "pan" | "node"; pointerId: number; sx: number; sy: number; ox: number; oy: number; id?: string } | null = null;
+function nodePosition(id: string, index: number) { return graphState.layout?.[id] ?? { x: 60 + (index % 3) * 340, y: 60 + Math.floor(index / 3) * 250 }; }
+function drawGraphWires(): void {
+  wireLayer.setAttribute("viewBox", "0 0 1500 1200"); wireLayer.setAttribute("width", "1500"); wireLayer.setAttribute("height", "1200"); wireLayer.replaceChildren();
+  for (const edge of graphState.edges) {
+    const source = graphStage.querySelector<HTMLElement>('[data-node-id="' + CSS.escape(edge.fromNodeId) + '"] [data-kind="out"][data-port="' + CSS.escape(edge.fromPort) + '"]');
+    const target = graphStage.querySelector<HTMLElement>('[data-node-id="' + CSS.escape(edge.toNodeId) + '"] [data-kind="in"][data-port="' + CSS.escape(edge.toPort) + '"]');
+    if (!source || !target) continue;
+    const sr = source.getBoundingClientRect(), tr = target.getBoundingClientRect(), wr = graphStage.getBoundingClientRect();
+    const x1 = (sr.left + sr.width / 2 - wr.left) / viewScale, y1 = (sr.top + sr.height / 2 - wr.top) / viewScale;
+    const x2 = (tr.left + tr.width / 2 - wr.left) / viewScale, y2 = (tr.top + tr.height / 2 - wr.top) / viewScale;
+    const bend = Math.max(55, Math.abs(x2 - x1) * 0.4);
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", "M " + x1 + " " + y1 + " C " + (x1 + bend) + " " + y1 + ", " + (x2 - bend) + " " + y2 + ", " + x2 + " " + y2);
+    path.setAttribute("class", "graph-wire"); wireLayer.append(path);
   }
 }
-
+function applyGraphView(): void { graphStage.style.transform = "translate(" + viewX + "px," + viewY + "px) scale(" + viewScale + ")"; drawGraphWires(); }
+function renderGraphEditor(): void {
+  for (const child of Array.from(graphStage.children)) if (child !== wireLayer) child.remove();
+  graphMeta.textContent = graphState.nodes.length + " NODES · " + graphState.edges.length + " LINKS";
+  graphState.nodes.forEach((node, index) => {
+    const definition = registry.get(node.type); if (!definition) return;
+    const info = nodeLabels[node.type] ?? { title: node.type, category: "NODE" };
+    const card = createElement("article", node.type === "landscape.compose" ? "editor-node output-node" : "editor-node");
+    card.dataset.nodeId = node.id; const pos = nodePosition(node.id, index); card.style.left = pos.x + "px"; card.style.top = pos.y + "px";
+    const heading = createElement("div", "editor-node-heading node-drag-handle");
+    const identity = createElement("div", "editor-node-identity");
+    identity.append(createElement("span", "node-type", info.category), createElement("strong", "editor-node-title", info.title), createElement("span", "node-id", node.id)); heading.append(identity);
+    const actions = createElement("div", "node-actions");
+    if (!DEFAULT_NODE_IDS.has(node.id)) { const remove = createElement("button", "remove-node", "ลบ"); remove.type = "button"; remove.dataset.action = "remove-node"; remove.dataset.nodeId = node.id; actions.append(remove); }
+    if (actions.childElementCount) heading.append(actions); card.append(heading);
+    if (node.type === "number.constant") {
+      const label = createElement("label", "node-param-label", "ค่า"), input = createElement("input", "node-param-input");
+      input.type = "number"; input.step = "any"; input.inputMode = "decimal"; input.value = String(typeof node.params?.value === "number" ? node.params.value : 0);
+      if (node.id === "scale") { input.min = "0.5"; input.max = "2.4"; input.step = "0.1"; }
+      if (node.id === "roughness") { input.min = "0.15"; input.max = "0.85"; input.step = "0.05"; }
+      if (node.id === "detail") { input.min = "1"; input.max = "6"; input.step = "1"; }
+      input.dataset.nodeId = node.id; input.dataset.param = "value"; label.append(input); card.append(label);
+    }
+    const ports = createElement("div", "node-ports"), ins = createElement("div", "port-group"), outs = createElement("div", "port-group output-group");
+    ins.append(createElement("span", "port-heading", "INPUT")); outs.append(createElement("span", "port-heading", "OUTPUT"));
+    if (!definition.inputs.length) ins.append(createElement("span", "port-empty", "ไม่มีช่องรับ"));
+    for (const port of definition.inputs) { const edge = graphState.edges.find(e => e.toNodeId === node.id && e.toPort === port); const from = edge ? graphState.nodes.find(n => n.id === edge.fromNodeId)?.id : null;
+      const btn = createElement("button", "port-button input-port", edge ? "← " + port + " · " + (from ?? "connected") : "← " + port); btn.type = "button"; btn.dataset.action = "connect-input"; btn.dataset.nodeId = node.id; btn.dataset.port = port; btn.dataset.kind = "in"; ins.append(btn); }
+    if (!definition.outputs.length) outs.append(createElement("span", "port-empty", "ไม่มีช่องส่ง"));
+    for (const port of definition.outputs) { const btn = createElement("button", "port-button output-port", port + " →"); btn.type = "button"; btn.dataset.action = "select-output"; btn.dataset.nodeId = node.id; btn.dataset.port = port; btn.dataset.kind = "out"; if (selectedOutput?.nodeId === node.id && selectedOutput.port === port) btn.classList.add("is-selected"); outs.append(btn); }
+    ports.append(ins, outs); card.append(ports); graphStage.append(card);
+  }); applyGraphView();
+}
 function updateOutputs(): void {
   const options = readOptions();
   requiredElement<HTMLOutputElement>("#scale-value").textContent = options.scale.toFixed(1);
@@ -323,7 +273,7 @@ for (const input of [seedInput, scaleInput, roughnessInput, detailInput]) {
   input.addEventListener("change", saveGraph);
 }
 
-nodeList.addEventListener("click", (event) => {
+graphStage.addEventListener("click", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
   const button = target.closest<HTMLButtonElement>("button[data-action]");
@@ -394,17 +344,6 @@ nodeList.addEventListener("click", (event) => {
     return;
   }
 
-  if (action === "move-node" && nodeId) {
-    const index = graphState.nodes.findIndex((node) => node.id === nodeId);
-    const nextIndex = index + Number(button.dataset.direction);
-    if (index < 0 || nextIndex < 0 || nextIndex >= graphState.nodes.length) return;
-    const nodes = [...graphState.nodes];
-    [nodes[index], nodes[nextIndex]] = [nodes[nextIndex], nodes[index]];
-    graphState = { ...graphState, nodes };
-    saveGraph();
-    scheduleRender();
-    return;
-  }
 
   if (action === "remove-node" && nodeId) {
     graphState = {
@@ -418,7 +357,7 @@ nodeList.addEventListener("click", (event) => {
   }
 });
 
-nodeList.addEventListener("change", (event) => {
+graphStage.addEventListener("change", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLInputElement) || target.dataset.param !== "value") return;
   let value = Number(target.value);
@@ -446,7 +385,8 @@ requiredElement<HTMLButtonElement>("#add-node").addEventListener("click", () => 
     ? { value: 1 }
     : type === "math.clamp" ? { min: 0, max: 1 } : {};
   const node: GraphNode = { id, type, params };
-  graphState = { ...graphState, nodes: [...graphState.nodes, node] };
+  const pos = { x: 360 + (graphState.nodes.length % 3) * 300, y: 80 + Math.floor(graphState.nodes.length / 3) * 240 };
+  graphState = { ...graphState, nodes: [...graphState.nodes, node], layout: { ...graphState.layout, [id]: pos } };
   saveGraph();
   graphStatus.textContent = "เพิ่ม Node แล้ว เลือกช่อง OUTPUT เพื่อเริ่มเชื่อมต่อ";
   scheduleRender();
@@ -497,6 +437,7 @@ graphFileInput.addEventListener("change", async () => {
 
 requiredElement<HTMLButtonElement>("#reset-graph").addEventListener("click", () => {
   graphState = createDefaultGraph();
+  viewX = 0; viewY = 0; viewScale = 0.78;
   selectedOutput = null;
   syncControlsFromGraph();
   saveGraph();
@@ -510,7 +451,34 @@ requiredElement<HTMLButtonElement>("#randomize").addEventListener("click", () =>
   scheduleRender();
 });
 
+graphViewport.addEventListener("pointerdown", (event) => {
+  const target = event.target as HTMLElement, card = target.closest<HTMLElement>(".editor-node"), handle = target.closest<HTMLElement>(".node-drag-handle");
+  if (card && handle && !target.closest("button,input,select")) {
+    const id = card.dataset.nodeId; if (!id) return; const pos = nodePosition(id, graphState.nodes.findIndex(n => n.id === id));
+    gesture = { kind: "node", pointerId: event.pointerId, sx: event.clientX, sy: event.clientY, ox: pos.x, oy: pos.y, id };
+    card.classList.add("is-dragging"); graphViewport.setPointerCapture(event.pointerId); event.preventDefault(); return;
+  }
+  if (!card && (target === graphViewport || target === graphStage || target === wireLayer)) {
+    gesture = { kind: "pan", pointerId: event.pointerId, sx: event.clientX, sy: event.clientY, ox: viewX, oy: viewY }; graphViewport.setPointerCapture(event.pointerId);
+  }
+});
+graphViewport.addEventListener("pointermove", (event) => {
+  if (!gesture || gesture.pointerId !== event.pointerId) return; const dx = event.clientX - gesture.sx, dy = event.clientY - gesture.sy;
+  if (gesture.kind === "pan") { viewX = gesture.ox + dx; viewY = gesture.oy + dy; applyGraphView(); }
+  else if (gesture.id) { const x = Math.max(0, Math.min(10000, gesture.ox + dx / viewScale)), y = Math.max(0, Math.min(10000, gesture.oy + dy / viewScale));
+    graphState = { ...graphState, layout: { ...graphState.layout, [gesture.id]: { x, y } } }; const node = graphStage.querySelector<HTMLElement>('[data-node-id="' + CSS.escape(gesture.id) + '"]');
+    if (node) { node.style.left = x + "px"; node.style.top = y + "px"; } drawGraphWires();
+  }
+});
+function endGraphGesture(event: PointerEvent): void { if (!gesture || gesture.pointerId !== event.pointerId) return; if (gesture.kind === "node") { graphStage.querySelector(".is-dragging")?.classList.remove("is-dragging"); saveGraph(); } gesture = null; }
+graphViewport.addEventListener("pointerup", endGraphGesture); graphViewport.addEventListener("pointercancel", endGraphGesture);
+graphViewport.addEventListener("wheel", (event) => { event.preventDefault(); const r = graphViewport.getBoundingClientRect(), px = event.clientX-r.left, py = event.clientY-r.top;
+  const next = Math.max(0.35, Math.min(1.5, viewScale * (event.deltaY < 0 ? 1.08 : 0.92))), ratio = next/viewScale;
+  viewX = px - (px-viewX)*ratio; viewY = py - (py-viewY)*ratio; viewScale = next; applyGraphView(); }, { passive: false });
+requiredElement<HTMLButtonElement>("#graph-zoom-in").addEventListener("click", () => { viewScale = Math.min(1.5, viewScale*1.15); applyGraphView(); });
+requiredElement<HTMLButtonElement>("#graph-zoom-out").addEventListener("click", () => { viewScale = Math.max(0.35, viewScale/1.15); applyGraphView(); });
+requiredElement<HTMLButtonElement>("#graph-zoom-reset").addEventListener("click", () => { viewX=0; viewY=0; viewScale=0.78; applyGraphView(); });
 renderGraphEditor();
-const observer = new ResizeObserver(scheduleRender);
+const observer = new ResizeObserver(() => { scheduleRender(); drawGraphWires(); });
 observer.observe(canvas);
 scheduleRender();
