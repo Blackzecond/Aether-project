@@ -59,13 +59,13 @@ Future graph types should explicitly distinguish scalar, vector, color, curve, g
 
 ## Shared landscape world model
 
-The Canvas landscape currently uses a lightweight 2.5D renderer with layered terrain profiles. River routing is a separate, bounded 2D elevation-field calculation shared by the world-generation pass.
+The current landscape generator uses a shared, compact 2D elevation field as the source for terrain silhouettes, drainage, river projection and vegetation suitability.
 
-- Terrain profiles are sampled once and reused by terrain rendering and vegetation placement.
-- River routing builds a compact seeded 2D elevation field, then solves a constrained path between seed-stable endpoints.
-- The route cost combines sampled elevation, lateral movement, and change in direction. This favors lower terrain while discouraging long detours and sharp turns.
-- A short smoothing pass reduces grid-like bends. River width is controlled globally, while perspective widening is applied independently.
-- The channel is rendered as overlapping round line segments instead of offset left/right polygons, avoiding the self-intersections that caused spikes.
-- The route is deterministic for a given seed and responds to terrain scale and roughness. Its endpoints remain fixed for that seed.
+- A seeded elevation function combines broad noise, three connected ridge spines, warped ridge centers and smaller surface variation. The three visible mountain bands are depth samples of this same field, not independent random profiles.
+- A 2.5D projection converts world depth and elevation into screen position. Increasing depth moves a point toward the viewer; increasing elevation raises it. River points use this same projection, so the water follows terrain height instead of a fixed diagonal overlay.
+- Hydrology starts at the downstream edge. A priority-flood pass fills closed depressions and builds a drainage-parent tree. Reverse traversal accumulates contributing area, and a headwater route follows parent links toward the outlet.
+- River width is derived from accumulated contributing area and depth perspective. The water slider scales the whole channel without changing its route.
+- Vegetation samples the same elevation and moisture fields. Density is reduced according to local ecological suitability and the river corridor.
+- The river is rendered between terrain depth layers so the nearest ridge can occlude it.
 
-This is a stable path-planning approximation, not full hydrology: it does not yet calculate water accumulation, drainage basins, erosion, or true 3D occlusion. Those require a shared 2D terrain height field used by all world elements, followed by flow accumulation and depth-aware rendering.
+This is a deterministic stylized drainage model, not a physically complete watershed simulation. It does not yet model sediment transport, rainfall events, tributary networks as separately visible streams, or full 3D terrain meshing. The compact 96×72 field keeps generation bounded for mobile preview.
