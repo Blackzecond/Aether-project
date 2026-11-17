@@ -1,9 +1,9 @@
 import { buildHeightfieldMesh } from "../../world/mesh/heightfield-mesh";
-import type { Heightfield } from "../../world/fields/heightfield";
+import { sampleElevation, type Heightfield } from "../../world/fields/heightfield";
 import type { DrainageField } from "../../world/hydrology/drainage";
 import type { RiverNetwork } from "../../world/hydrology/rivers";
 
-export type TerrainViewMode = "world" | "shaded" | "elevation" | "slope" | "normals" | "wireframe" | "hydrology";
+export type TerrainViewMode = "world" | "first-person" | "shaded" | "elevation" | "slope" | "normals" | "wireframe" | "hydrology";
 
 const waterVertexSource = `#version 300 es
 precision highp float;
@@ -170,7 +170,7 @@ function multiply(a: Float32Array, b: Float32Array): Float32Array {
   return out;
 }
 
-const MODE: Record<TerrainViewMode, number> = { world: 0, shaded: 0, elevation: 1, slope: 2, normals: 3, wireframe: 4, hydrology: 5 };
+const MODE: Record<TerrainViewMode, number> = { world: 0, "first-person": 0, shaded: 0, elevation: 1, slope: 2, normals: 3, wireframe: 4, hydrology: 5 };
 
 export class TerrainPreviewRenderer {
   private readonly gl: WebGL2RenderingContext;
@@ -206,6 +206,12 @@ export class TerrainPreviewRenderer {
   private readonly maxAccumulationLocation: WebGLUniformLocation;
   private readonly pointers = new Map<number, { x: number; y: number }>();
   private previousPinch = 0;
+  private field: Heightfield | null = null;
+  private playerX = 0;
+  private playerZ = 0;
+  private playerYaw = 0;
+  private playerPitch = -0.04;
+  private readonly humanEyeHeight = 0.0016; // 1.6 m when one world unit represents 1 km
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     const gl = canvas.getContext("webgl2", { antialias: true, alpha: false, powerPreference: "low-power" });
@@ -286,6 +292,9 @@ export class TerrainPreviewRenderer {
         const nextPinch = this.pinchDistance();
         if (this.previousPinch > 0 && nextPinch > 0) this.distance = Math.max(this.fitDistance * 0.28, Math.min(this.fitDistance * 2.2, this.distance * this.previousPinch / nextPinch));
         this.previousPinch = nextPinch;
+      } else if (this.mode === "first-person") {
+        this.playerYaw -= dx * 0.006;
+        this.playerPitch = Math.max(-1.05, Math.min(1.05, this.playerPitch - dy * 0.004));
       } else {
         this.azimuth -= dx * 0.008;
         this.elevation = Math.max(0.16, Math.min(1.32, this.elevation + dy * 0.006));
@@ -313,15 +322,47 @@ export class TerrainPreviewRenderer {
   }
 
   resetCamera(): void {
+    if (this.mode === "first-person") {
+      this.enterFirstPerson();
+      return;
+    }
     this.azimuth = 0.76;
     this.elevation = 0.24;
     this.distance = this.fitDistance * 0.46;
     this.render();
   }
 
-  setMode(mode: TerrainViewMode): void { this.mode = mode; this.render(); }
+  setMode(mode: TerrainViewMode): void {
+    this.mode = mode;
+    if (mode === "first-person") this.enterFirstPerson();
+    else this.render();
+  }
+
+  enterFirstPerson(): void {
+    if (!this.field) return;
+    this.playerX = (this.field.bounds.minX + this.field.bounds.maxX) * 0.5;
+    this.playerZ = (this.field.bounds.minZ + this.field.bounds.maxZ) * 0.5;
+    this.playerYaw = 0;
+    this.playerPitch = -0.04;
+    this.render();
+  }
+
+  movePlayer(forward: number, right: number): void {
+    if (this.mode !== "first-person" || !this.field) return;
+    const speed = 0.0003;
+    const sin = Math.sin(this.playerYaw), cos = Math.cos(this.playerYaw);
+    const dx = (-sin * forward + cos * right) * speed;
+    const dz = (-cos * forward - sin * right) * speed;
+    const b = this.field.bounds;
+    const x = Math.max(b.minX + 0.008, Math.min(b.maxX - 0.008, this.playerX + dx));
+    const z = Math.max(b.minZ + 0.008, Math.min(b.maxZ - 0.008, this.playerZ + dz));
+    this.playerX = x;
+    this.playerZ = z;
+    this.render();
+  }
 
   setTerrain(field: Heightfield): void {
+    this.field = field;
     const gl = this.gl;
     const mesh = buildHeightfieldMesh(field, 1.18);
     this.vertexCount = mesh.vertexCount;
@@ -454,14 +495,22 @@ export class TerrainPreviewRenderer {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.useProgram(this.program);
 
-    const horizontal = Math.cos(this.elevation) * this.distance;
-    const camera = [
-      this.cameraTarget[0] + Math.sin(this.azimuth) * horizontal,
-      this.cameraTarget[1] + Math.sin(this.elevation) * this.distance,
-      this.cameraTarget[2] + Math.cos(this.azimuth) * horizontal,
-    ];
-    const view = lookAt(camera, this.cameraTarget, [0, 1, 0]);
-    const projection = perspective(0.72, this.canvas.width / Math.max(1, this.canvas.height), 0.1, 100);
+    const exploring = this.mode === "first-person";
+    const camera = exploring && this.field
+      ? [this.playerX, sampleElevation(this.field, this.playerX, this.playerZ) * 1.18 + this.humanEyeHeight, this.playerZ]
+      : (() => {
+          const horizontal = Math.cos(this.elevation) * this.distance;
+          return [
+            this.cameraTarget[0] + Math.sin(this.azimuth) * horizontal,
+            this.cameraTarget[1] + Math.sin(this.elevation) * this.distance,
+            this.cameraTarget[2] + Math.cos(this.azimuth) * horizontal,
+          ];
+        })();
+    const target = exploring
+      ? [camera[0] + Math.sin(this.playerYaw) * Math.cos(this.playerPitch), camera[1] + Math.sin(this.playerPitch), camera[2] - Math.cos(this.playerYaw) * Math.cos(this.playerPitch)]
+      : this.cameraTarget;
+    const view = lookAt(camera, target, [0, 1, 0]);
+    const projection = perspective(0.72, this.canvas.width / Math.max(1, this.canvas.height), exploring ? 0.00015 : 0.1, exploring ? 8 : 100);
     const mvp = multiply(projection, view);
     const model = new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
 
@@ -482,7 +531,7 @@ export class TerrainPreviewRenderer {
       gl.drawElements(gl.TRIANGLES, this.triangleCount, gl.UNSIGNED_INT, 0);
     }
     gl.bindVertexArray(null);
-    if(this.mode==="world" && this.waterVertexCount>0){
+    if((this.mode==="world" || this.mode==="first-person") && this.waterVertexCount>0){
       gl.useProgram(this.waterProgram);gl.uniformMatrix4fv(this.waterMvpLocation,false,mvp);gl.bindVertexArray(this.waterVao);
       gl.disable(gl.CULL_FACE);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.drawArrays(gl.TRIANGLES,0,this.waterVertexCount);gl.disable(gl.BLEND);gl.enable(gl.CULL_FACE);gl.bindVertexArray(null);
     }
