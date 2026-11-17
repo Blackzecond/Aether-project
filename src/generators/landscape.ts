@@ -105,41 +105,32 @@ function drawForestLayer(
   }
 }
 
-function traceRiverEdge(world: LandscapeWorld, side: -1 | 1): Array<{ x: number; y: number }> {
+function traceRiverEdge(world: LandscapeWorld, side: -1 | 1, extraWidth = 0): Array<{ x: number; y: number }> {
   return world.river.map((point, index) => {
     const before = world.river[Math.max(0, index - 1)];
     const after = world.river[Math.min(world.river.length - 1, index + 1)];
     const dx = after.x - before.x;
     const dy = after.y - before.y;
     const length = Math.max(0.001, Math.hypot(dx, dy));
-    return { x: point.x + (dy / length) * point.width * side, y: point.y - (dx / length) * point.width * side };
+    const offset = point.width + extraWidth;
+    return { x: point.x - (dy / length) * offset * side, y: point.y + (dx / length) * offset * side };
   });
 }
 
 function drawRiver(context: CanvasRenderingContext2D, world: LandscapeWorld, strength: number, palette: (typeof palettes)[number]): void {
   if (strength <= 0.01 || world.river.length < 2) return;
-  const left = traceRiverEdge(world, -1);
-  const right = traceRiverEdge(world, 1);
   const drawChannel = (extraWidth: number, color: string, alpha: number): void => {
+    const left = traceRiverEdge(world, -1, extraWidth);
+    const right = traceRiverEdge(world, 1, extraWidth);
     context.save();
     context.globalAlpha = alpha;
     context.beginPath();
-    world.river.forEach((point, index) => {
-      const before = world.river[Math.max(0, index - 1)];
-      const after = world.river[Math.min(world.river.length - 1, index + 1)];
-      const dx = after.x - before.x, dy = after.y - before.y;
-      const length = Math.max(0.001, Math.hypot(dx, dy));
-      const x = point.x - (dy / length) * (point.width + extraWidth);
-      const y = point.y + (dx / length) * (point.width + extraWidth);
-      if (index === 0) context.moveTo(x, y); else context.lineTo(x, y);
+    left.forEach((point, index) => {
+      if (index === 0) context.moveTo(point.x, point.y);
+      else context.lineTo(point.x, point.y);
     });
     for (let index = right.length - 1; index >= 0; index -= 1) {
-      const point = world.river[index];
-      const before = world.river[Math.max(0, index - 1)];
-      const after = world.river[Math.min(world.river.length - 1, index + 1)];
-      const dx = after.x - before.x, dy = after.y - before.y;
-      const length = Math.max(0.001, Math.hypot(dx, dy));
-      context.lineTo(point.x + (dy / length) * (point.width + extraWidth), point.y - (dx / length) * (point.width + extraWidth));
+      context.lineTo(right[index].x, right[index].y);
     }
     context.closePath();
     context.fillStyle = color;
