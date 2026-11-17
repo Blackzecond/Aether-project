@@ -371,13 +371,22 @@ nodeList.addEventListener("click", (event) => {
       toNodeId: nodeId,
       toPort: port,
     };
-    graphState = {
+    const candidate: GraphDocument = {
       ...graphState,
       edges: [
         ...graphState.edges.filter((item) => !(item.toNodeId === nodeId && item.toPort === port)),
         edge,
       ],
     };
+    try {
+      evaluateGraph(candidate, registry);
+    } catch (error) {
+      graphStatus.textContent = error instanceof Error ? error.message : "การเชื่อมต่อนี้ใช้ไม่ได้";
+      selectedOutput = null;
+      renderGraphEditor();
+      return;
+    }
+    graphState = candidate;
     selectedOutput = null;
     saveGraph();
     graphStatus.textContent = "เชื่อมต่อแล้ว";
@@ -452,7 +461,7 @@ requiredElement<HTMLButtonElement>("#export-graph").addEventListener("click", ()
     link.href = url;
     link.download = "aether-graph.json";
     link.click();
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
     graphStatus.textContent = "ส่งออก Graph แล้ว";
   } catch (error) {
     graphStatus.textContent = error instanceof Error ? error.message : "ส่งออก Graph ไม่สำเร็จ";
