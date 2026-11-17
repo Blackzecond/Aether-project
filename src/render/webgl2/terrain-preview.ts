@@ -3,6 +3,7 @@ import { sampleElevation, type Heightfield } from "../../world/fields/heightfiel
 import type { DrainageField } from "../../world/hydrology/drainage";
 import type { RiverNetwork } from "../../world/hydrology/rivers";
 import type { GroundCoverInstance, VegetationInstance } from "../../world/ecology/vegetation";
+import type { VolumeMesh } from "../../world/volume/density-world";
 
 export type TerrainViewMode = "world" | "first-person" | "shaded" | "elevation" | "slope" | "normals" | "wireframe" | "hydrology";
 
@@ -325,6 +326,7 @@ export class TerrainPreviewRenderer {
   private maximumAccumulation = 1;
   private vertexCount = 0;
   private surfaceVertexCount = 0;
+  private usesVolumeMesh = false;
   private triangleCount = 0;
   private lineCount = 0;
   private mode: TerrainViewMode = "world";
@@ -561,69 +563,57 @@ export class TerrainPreviewRenderer {
   }
 
   setTerrain(field: Heightfield): void {
-    this.field = field;
-    const gl = this.gl;
-    const mesh = buildHeightfieldMesh(field, 1.18);
-    this.vertexCount = mesh.vertexCount;
-    this.surfaceVertexCount = field.width * field.height;
-    this.waterVertexCount = 0;
-    this.maximumAccumulation = 1;
-    let minHeight = Infinity;
-    let maxHeight = -Infinity;
-    for (const value of field.values) {
-      minHeight = Math.min(minHeight, value);
-      maxHeight = Math.max(maxHeight, value);
-    }
-    const baseY = Math.min(0, minHeight * 1.18 - 0.012);
-    const maxY = maxHeight * 1.18;
-    this.cameraTarget = [
-      (field.bounds.minX + field.bounds.maxX) * 0.5,
-      baseY + (maxY - baseY) * 0.32,
-      (field.bounds.minZ + field.bounds.maxZ) * 0.5,
+    this.uploadTerrainMesh(field,buildHeightfieldMesh(field,1.18),false);
+  }
+
+  setVolumeTerrain(field: Heightfield,mesh:VolumeMesh):void {
+    this.uploadTerrainMesh(field,mesh,true);
+  }
+
+  private uploadTerrainMesh(
+    field:Heightfield,
+    mesh:{readonly positions:Float32Array;readonly normals:Float32Array;readonly indices:Uint32Array;readonly vertexCount:number},
+    volume:boolean,
+  ):void {
+    this.field=field;
+    this.usesVolumeMesh=volume;
+    const gl=this.gl;
+    this.vertexCount=mesh.vertexCount;
+    this.surfaceVertexCount=field.width*field.height;
+    this.waterVertexCount=0;
+    this.maximumAccumulation=1;
+    let minHeight=Infinity,maxHeight=-Infinity;
+    for(const value of field.values){minHeight=Math.min(minHeight,value);maxHeight=Math.max(maxHeight,value);}
+    const baseY=Math.min(0,minHeight*1.18-0.012),maxY=maxHeight*1.18;
+    this.cameraTarget=[
+      (field.bounds.minX+field.bounds.maxX)*0.5,
+      baseY+(maxY-baseY)*0.32,
+      (field.bounds.minZ+field.bounds.maxZ)*0.5,
     ];
-    this.cameraRadius = Math.hypot(
-      (field.bounds.maxX - field.bounds.minX) * 0.5,
-      (maxY - baseY) * 0.5,
-      (field.bounds.maxZ - field.bounds.minZ) * 0.5,
+    this.cameraRadius=Math.hypot(
+      (field.bounds.maxX-field.bounds.minX)*0.5,
+      (maxY-baseY)*0.5,
+      (field.bounds.maxZ-field.bounds.minZ)*0.5,
     );
-    const zoomRatio = this.triangleCount > 0 ? this.distance / this.fitDistance : 0.46;
+    const zoomRatio=this.triangleCount>0?this.distance/this.fitDistance:0.46;
     this.updateCameraFit();
-    this.distance = Math.max(this.fitDistance * 0.28, Math.min(this.fitDistance * 2.2, this.fitDistance * zoomRatio));
-    const lines = new Uint32Array((field.width - 1) * field.height * 2 + (field.height - 1) * field.width * 2);
-    let cursor = 0;
-    for (let z = 0; z < field.height; z += 1) {
-      for (let x = 0; x < field.width - 1; x += 1) {
-        const index = z * field.width + x;
-        lines[cursor++] = index;
-        lines[cursor++] = index + 1;
-      }
+    this.distance=Math.max(this.fitDistance*0.28,Math.min(this.fitDistance*2.2,this.fitDistance*zoomRatio));
+    const lines=new Uint32Array(mesh.indices.length*2);
+    for(let i=0;i<mesh.indices.length;i+=3){
+      const a=mesh.indices[i],b=mesh.indices[i+1],d=mesh.indices[i+2],o=i*2;
+      lines[o]=a;lines[o+1]=b;lines[o+2]=b;lines[o+3]=d;lines[o+4]=d;lines[o+5]=a;
     }
-    for (let x = 0; x < field.width; x += 1) {
-      for (let z = 0; z < field.height - 1; z += 1) {
-        const index = z * field.width + x;
-        lines[cursor++] = index;
-        lines[cursor++] = index + field.width;
-      }
-    }
-
     gl.bindVertexArray(this.vao);
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, mesh.positions, gl.STATIC_DRAW);
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.normalBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, mesh.normals, gl.STATIC_DRAW);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, mesh.indices, gl.STATIC_DRAW);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.lineBuffer);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, lines, gl.STATIC_DRAW);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.accumulationBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.vertexCount), gl.DYNAMIC_DRAW);
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.channelBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.vertexCount), gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER,this.positionBuffer);gl.bufferData(gl.ARRAY_BUFFER,mesh.positions,gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER,this.normalBuffer);gl.bufferData(gl.ARRAY_BUFFER,mesh.normals,gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,this.indexBuffer);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,mesh.indices,gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,this.lineBuffer);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,lines,gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,this.indexBuffer);
+    gl.bindBuffer(gl.ARRAY_BUFFER,this.accumulationBuffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(this.vertexCount),gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ARRAY_BUFFER,this.channelBuffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(this.vertexCount),gl.DYNAMIC_DRAW);
     gl.bindVertexArray(null);
-
-    this.triangleCount = mesh.indices.length;
-    this.lineCount = lines.length;
+    this.triangleCount=mesh.indices.length;
+    this.lineCount=lines.length;
     this.render();
   }
 
