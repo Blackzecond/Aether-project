@@ -194,7 +194,7 @@ export class TerrainPreviewRenderer {
   private lineCount = 0;
   private mode: TerrainViewMode = "world";
   private azimuth = 0.76;
-  private elevation = 0.58;
+  private elevation = 0.42;
   private distance = 4.35;
   private fitDistance = 4.35;
   private cameraTarget = [0, 0.34, 0];
@@ -326,6 +326,7 @@ export class TerrainPreviewRenderer {
     const mesh = buildHeightfieldMesh(field, 1.18);
     this.vertexCount = mesh.vertexCount;
     this.surfaceVertexCount = field.width * field.height;
+    this.waterVertexCount = 0;
     this.maximumAccumulation = 1;
     let minHeight = Infinity;
     let maxHeight = -Infinity;
@@ -345,7 +346,7 @@ export class TerrainPreviewRenderer {
       (maxY - baseY) * 0.5,
       (field.bounds.maxZ - field.bounds.minZ) * 0.5,
     );
-    const zoomRatio = this.triangleCount > 0 ? this.distance / this.fitDistance : 1;
+    const zoomRatio = this.triangleCount > 0 ? this.distance / this.fitDistance : 0.82;
     this.updateCameraFit();
     this.distance = Math.max(this.fitDistance * 0.58, Math.min(this.fitDistance * 2.2, this.fitDistance * zoomRatio));
     const lines = new Uint32Array((field.width - 1) * field.height * 2 + (field.height - 1) * field.width * 2);
