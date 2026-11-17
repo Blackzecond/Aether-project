@@ -54,13 +54,13 @@ export function buildHeightfieldMesh(field: Heightfield, verticalScale = 1): Ter
     const ax = positions[p], az = positions[p + 2];
     const bx = positions[q], bz = positions[q + 2];
     const dx = bx - ax, dz = bz - az;
-    const nx = -dz, nz = dx;
+    const nx = dz, nz = -dx;
     const topA = wallStart + i * 2, bottomA = topA + 1;
     const topB = wallStart + ((i + 1) % perimeter.length) * 2, bottomB = topB + 1;
     put(topA, ax, positions[p + 1], az, nx, 0, nz);
     put(bottomA, ax, baseY, az, nx, 0, nz);
     if (i === 0) { /* keep each wall segment independent for crisp edge normals */ }
-    indices.push(topA, bottomA, topB, topB, bottomA, bottomB);
+    indices.push(topA, topB, bottomA, topB, bottomB, bottomA);
   });
 
   const corners = [
@@ -70,7 +70,7 @@ export function buildHeightfieldMesh(field: Heightfield, verticalScale = 1): Ter
     [bounds.minX, baseY, bounds.maxZ],
   ];
   corners.forEach((point, i) => put(bottomStart + i, point[0], point[1], point[2], 0, -1, 0));
-  indices.push(bottomStart, bottomStart + 2, bottomStart + 1, bottomStart, bottomStart + 3, bottomStart + 2);
+  indices.push(bottomStart, bottomStart + 1, bottomStart + 2, bottomStart, bottomStart + 2, bottomStart + 3);
 
   const indexArray = new Uint32Array(indices);
   return { positions, normals, indices: indexArray, vertexCount, triangleCount: indexArray.length / 3 };
