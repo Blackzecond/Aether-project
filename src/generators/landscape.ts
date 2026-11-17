@@ -1,4 +1,4 @@
-import { createLandscapeWorld, sampleSurface, type LandscapeOptions, type LandscapeWorld, type TerrainLayer } from "./world";
+import { createLandscapeWorld, sampleSurface, sampleWorldField, type LandscapeOptions, type LandscapeWorld, type TerrainLayer } from "./world";
 
 export type { LandscapeOptions } from "./world";
 
@@ -90,10 +90,16 @@ function drawForestLayer(
   if (density <= 0.01) return;
   const random = seededRandom(seed);
   const width = world.width;
-  for (let index = 0; index < Math.round(count * density); index += 1) {
+  for (let index = 0; index < Math.round(count * density * 1.45); index += 1) {
     const x = random() * width;
+    const nx = x / width;
+    const moisture = sampleWorldField(world.moisture, nx, layer.depth);
+    const elevation = sampleWorldField(world.elevation, nx, layer.depth);
+    const ecologicalSuitability = (0.48 + moisture * 0.72) * (1.08 - elevation * 0.42);
+    if (random() > ecologicalSuitability) continue;
     const groundY = sampleSurface(layer, x, width) * height;
-    const size = height * (0.025 + random() * 0.045) * sizeScale * (0.45 + density * 0.65);
+    const depthScale = 0.62 + layer.depth * 0.72;
+    const size = height * (0.025 + random() * 0.045) * sizeScale * depthScale * (0.45 + density * 0.65);
     const baseY = groundY + size * 0.035;
     if (overlapsRiver(world, x, baseY, size * 0.48)) continue;
     const shade = random();
@@ -172,8 +178,9 @@ export function drawLandscape(context: CanvasRenderingContext2D, width: number, 
   drawTerrainLayer(context, world.layers[0], width, height, palette.far);
   drawTerrainLayer(context, world.layers[1], width, height, palette.mid);
   drawForestLayer(context, world, world.layers[1], height, options.seed + 311, options.forest * 0.72, palette.far, 42, 0.72, 0.52);
-  drawTerrainLayer(context, world.layers[2], width, height, palette.near);
+  // Water is drawn between depth layers so foreground ridges naturally occlude it.
   drawRiver(context, world, Math.max(0, Math.min(1, options.water)), palette);
+  drawTerrainLayer(context, world.layers[2], width, height, palette.near);
   drawForestLayer(context, world, world.layers[2], height, options.seed + 977, options.forest, palette.near, 58, 1.25, 0.92);
 
   const mistStrength = Math.max(0, Math.min(1, options.mist));
