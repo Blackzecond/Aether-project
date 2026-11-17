@@ -55,6 +55,7 @@ input[type="range"] { display: block; width: 100%; height: 28px; margin: 0; acce
 .graph-panel[open] .chevron { transform: rotate(180deg); }
 .graph-description, .graph-footnote { color: #a4b3a9; font-size: 11px; line-height: 1.65; }
 .graph-description { margin: 0 0 12px; }
+.graph-file-toolbar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
 .graph-toolbar { display: flex; gap: 8px; align-items: center; }
 .graph-toolbar select { min-width: 0; flex: 1; height: 38px; padding: 0 9px; border: 1px solid var(--line); border-radius: 9px; background: #17231f; color: #e8eee9; font-size: 11px; }
 .graph-toolbar .quiet-button { flex: 0 0 auto; }
@@ -64,6 +65,9 @@ input[type="range"] { display: block; width: 100%; height: 28px; margin: 0; acce
 .editor-node.output-node { border-color: rgba(190, 218, 192, .35); background: #22352b; }
 .editor-node-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 9px; }
 .editor-node-identity { display: grid; gap: 3px; }
+.node-actions { display: flex; align-items: center; gap: 5px; }
+.move-node { width: 29px; height: 29px; padding: 0; border: 1px solid var(--line); border-radius: 7px; background: #22342b; color: #c5d9c8; font-size: 15px; }
+.node-actions button:focus-visible { outline: 2px solid #c2dfc4; outline-offset: 2px; }
 .editor-node-title { color: #e1ebe2; font-size: 12px; font-weight: 650; }
 .node-id { color: #7f9586; font-size: 9px; }
 .remove-node { padding: 5px 8px; border: 1px solid var(--line); border-radius: 7px; background: transparent; color: #b6c4b9; font-size: 9px; }
