@@ -435,7 +435,7 @@ export class TerrainPreviewRenderer {
     const zoomRatio = this.distance / this.fitDistance;
     const rect = this.canvas.getBoundingClientRect();
     this.updateCameraFit();
-    this.distance = Math.max(this.fitDistance * 0.58, Math.min(this.fitDistance * 2.2, this.fitDistance * zoomRatio));
+    this.distance = Math.max(this.fitDistance * 0.28, Math.min(this.fitDistance * 2.2, this.fitDistance * zoomRatio));
     const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
     const width = Math.max(1, Math.round(rect.width * dpr));
     const height = Math.max(1, Math.round(rect.height * dpr));
