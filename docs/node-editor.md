@@ -5,7 +5,7 @@ The editor uses a freeform 2D canvas with DOM node cards and an SVG wire layer.
 ## Interactions
 - Drag a node by its header to position it freely.
 - Drag the empty canvas area to pan; use zoom controls or the mouse wheel to zoom.
-- Tap an output port, then tap an input port to connect. Tap a connected input with no output selected to disconnect.
+- Drag from an output port to an input port to connect; tap an output then an input as an alternative. Tap a connected input with no output selected to disconnect.
 - New connections replace an occupied input and are checked by the graph evaluator before saving.
 - Add Number, Add, Multiply, and Clamp nodes; added nodes can be removed while starter nodes remain protected.
 - Node positions are saved with the graph and included in JSON export/import.
