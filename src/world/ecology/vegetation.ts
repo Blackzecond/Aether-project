@@ -52,7 +52,6 @@ export function generateVegetation(
       if (elevation < 0.035 || elevation > 0.92 || surface.slope > 0.78) continue;
 
       const ix = Math.round(gridX), iz = Math.round(gridZ);
-      const index = iz * field.width + ix;
       let nearWater = false;
       if (rivers) {
         for (let dz = -2; dz <= 2 && !nearWater; dz += 1) {
