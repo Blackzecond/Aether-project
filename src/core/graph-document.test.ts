@@ -15,12 +15,14 @@ const sample: GraphDocument = {
 describe("graph document interchange", () => {
   it("round-trips a graph with a version marker", () => {
     const source = serializeGraphDocument(sample);
-    expect(JSON.parse(source).version).toBe(1);
-    expect(parseGraphDocument(source)).toEqual(sample);
+    expect(JSON.parse(source).version).toBe(2);
+    expect(parseGraphDocument(source)).toMatchObject(sample);
   });
 
-  it("rejects unsupported versions", () => {
-    expect(() => parseGraphDocument('{"version":2,"nodes":[],"edges":[]}'))
+  it("migrates version 1 documents and rejects unsupported versions", () => {
+    const migrated = parseGraphDocument('{"version":1,"nodes":[{"id":"legacy","type":"number.constant"}],"edges":[]}');
+    expect(migrated.layout?.legacy).toEqual({ x: 60, y: 60 });
+    expect(() => parseGraphDocument('{"version":3,"nodes":[],"edges":[]}'))
       .toThrow(GraphDocumentFormatError);
   });
 
@@ -49,6 +51,15 @@ describe("graph document interchange", () => {
   it("rejects edges that reference missing nodes", () => {
     const invalid = '{"version":1,"nodes":[],"edges":[{"id":"e","fromNodeId":"missing","fromPort":"value","toNodeId":"also-missing","toPort":"a"}]}';
     expect(() => parseGraphDocument(invalid)).toThrow(/node that does not exist/);
+  });
+
+  it("round-trips positions and rejects invalid layout data", () => {
+    const positioned: GraphDocument = { ...sample, layout: { seed: { x: 240, y: 180 }, sum: { x: 600, y: 180 } } };
+    expect(parseGraphDocument(serializeGraphDocument(positioned)).layout).toEqual(positioned.layout);
+    const missing = '{"version":2,"nodes":[{"id":"a","type":"number.constant"}],"edges":[],"layout":{"ghost":{"x":0,"y":0}}}';
+    const outside = '{"version":2,"nodes":[{"id":"a","type":"number.constant"}],"edges":[],"layout":{"a":{"x":-1,"y":0}}}';
+    expect(() => parseGraphDocument(missing)).toThrow(/missing node/);
+    expect(() => parseGraphDocument(outside)).toThrow(/coordinates/);
   });
 
   it("rejects malformed JSON", () => {
