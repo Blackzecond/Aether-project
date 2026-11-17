@@ -350,6 +350,7 @@ graphStage.addEventListener("click", (event) => {
     graphState = {
       nodes: graphState.nodes.filter((node) => node.id !== nodeId),
       edges: graphState.edges.filter((edge) => edge.fromNodeId !== nodeId && edge.toNodeId !== nodeId),
+      layout: Object.fromEntries(Object.entries(graphState.layout ?? {}).filter(([id]) => id !== nodeId)),
     };
     selectedOutput = null;
     saveGraph();
