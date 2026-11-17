@@ -128,9 +128,10 @@ export function serializeGraphDocument(graph: GraphDocument): string {
     throw new GraphDocumentFormatError("Graph document could not be serialized.");
   }
   if (source === undefined) throw new GraphDocumentFormatError("Graph document could not be serialized.");
-  return JSON.stringify(JSON.parse(source) && validateDocument(JSON.parse(source)) && {
+  const normalized = validateDocument(JSON.parse(source) as unknown);
+  return JSON.stringify({
     version: GRAPH_DOCUMENT_VERSION,
-    nodes: graph.nodes,
-    edges: graph.edges,
+    nodes: normalized.nodes,
+    edges: normalized.edges,
   }, null, 2);
 }
