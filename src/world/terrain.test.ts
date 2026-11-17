@@ -61,7 +61,7 @@ describe("world foundation v2", () => {
     const mesh = buildHeightfieldMesh(field);
     const perimeterVertices = 2 * (field.width + field.height) - 4;
     const expectedVertices = field.width * field.height + perimeterVertices * 3 + 2;
-    const expectedTriangles = (field.width - 1) * (field.height - 1) * 2 + perimeterVertices * 4;
+    const expectedTriangles = (field.width - 1) * (field.height - 1) * 2 + perimeterVertices * 6;
     expect(mesh.vertexCount).toBe(expectedVertices);
     expect(mesh.triangleCount).toBe(expectedTriangles);
     expect(mesh.indices.length).toBe(expectedTriangles * 3);
