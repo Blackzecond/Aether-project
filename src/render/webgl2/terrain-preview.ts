@@ -2,7 +2,7 @@ import { buildHeightfieldMesh } from "../../world/mesh/heightfield-mesh";
 import { sampleElevation, type Heightfield } from "../../world/fields/heightfield";
 import type { DrainageField } from "../../world/hydrology/drainage";
 import type { RiverNetwork } from "../../world/hydrology/rivers";
-import type { VegetationInstance } from "../../world/ecology/vegetation";
+import type { GroundCoverInstance, VegetationInstance } from "../../world/ecology/vegetation";
 
 export type TerrainViewMode = "world" | "first-person" | "shaded" | "elevation" | "slope" | "normals" | "wireframe" | "hydrology";
 
@@ -135,6 +135,68 @@ void main() {
 
 const treeVertexSource = "#version 300 es\nprecision highp float;\nlayout(location=0) in vec3 aPosition;\nlayout(location=1) in vec3 aNormal;\nlayout(location=2) in vec3 iOffset;\nlayout(location=3) in float iScale;\nlayout(location=4) in float iTint;\nuniform mat4 uMvp;\nout vec3 vNormal;\nout float vHeight;\nout float vTint;\nvoid main(){vec3 world=aPosition*iScale+iOffset;vNormal=aNormal;vHeight=aPosition.y;vTint=iTint;gl_Position=uMvp*vec4(world,1.0);}";
 const treeFragmentSource = "#version 300 es\nprecision highp float;\nin vec3 vNormal;in float vHeight;in float vTint;out vec4 outColor;\nvoid main(){vec3 n=normalize(vNormal);vec3 light=normalize(vec3(-0.45,0.82,0.36));float diffuse=max(dot(n,light),0.0);vec3 bark=mix(vec3(0.19,0.13,0.085),vec3(0.34,0.23,0.13),vTint*0.55);vec3 leaf=mix(vec3(0.055,0.19,0.105),vec3(0.20,0.34,0.16),vTint*0.72);vec3 color=vHeight<0.38?bark:leaf;color*=0.42+diffuse*0.72;outColor=vec4(color,1.0);}";
+const groundVertexSource = `#version 300 es
+precision highp float;
+layout(location=0) in vec3 aPosition;
+layout(location=1) in vec3 aNormal;
+layout(location=2) in float aKind;
+layout(location=3) in vec3 iOffset;
+layout(location=4) in float iScale;
+layout(location=5) in float iTint;
+layout(location=6) in float iKind;
+uniform mat4 uMvp;
+uniform vec3 uCameraPosition;
+uniform float uRange;
+out vec3 vNormal;
+out float vTint;
+out float vKind;
+void main(){
+  if(abs(aKind-iKind)>0.1 || distance(iOffset.xz,uCameraPosition.xz)>uRange){gl_Position=vec4(2.0,2.0,2.0,1.0);return;}
+  vec3 world=aPosition*iScale+iOffset;
+  vNormal=aNormal;vTint=iTint;vKind=iKind;gl_Position=uMvp*vec4(world,1.0);
+}`;
+const groundFragmentSource = `#version 300 es
+precision highp float;
+in vec3 vNormal;in float vTint;in float vKind;out vec4 outColor;
+void main(){
+  vec3 n=normalize(vNormal),light=normalize(vec3(-0.42,0.84,0.34));
+  float diffuse=max(dot(n,light),0.0);vec3 base;
+  if(vKind<0.5)base=mix(vec3(0.13,0.27,0.075),vec3(0.39,0.49,0.18),vTint);
+  else if(vKind<1.5)base=mix(vec3(0.055,0.20,0.095),vec3(0.22,0.39,0.16),vTint);
+  else if(vKind<2.5)base=mix(vec3(0.12,0.23,0.10),vec3(0.34,0.43,0.20),vTint);
+  else base=mix(vec3(0.25,0.25,0.22),vec3(0.48,0.46,0.39),vTint);
+  outColor=vec4(base*(0.52+diffuse*0.68),1.0);
+}`;
+function buildGroundCoverGeometry(): Float32Array {
+  const out:number[]=[];
+  const tri=(a:number[],b:number[],d:number[],kind:number)=>{
+    const ux=b[0]-a[0],uy=b[1]-a[1],uz=b[2]-a[2],vx=d[0]-a[0],vy=d[1]-a[1],vz=d[2]-a[2];
+    let nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;const len=Math.hypot(nx,ny,nz)||1;
+    nx/=len;ny/=len;nz/=len;
+    for(const p of [a,b,d])out.push(p[0],p[1],p[2],nx,ny,nz,kind);
+  };
+  for(let i=0;i<5;i++){
+    const angle=i/5*Math.PI*2,dx=Math.cos(angle),dz=Math.sin(angle),sx=-dz*0.10,sz=dx*0.10;
+    tri([-sx,0,-sz],[sx,0,sz],[dx*0.16,0.95,dz*0.16],0);
+  }
+  for(let i=0;i<4;i++){
+    const angle=i/4*Math.PI*2,dx=Math.cos(angle),dz=Math.sin(angle),px=-dz,pz=dx;
+    tri([0,0,0],[dx*0.10,0.08,dz*0.10],[dx*0.82,0.72,dz*0.82],1);
+    for(let j=1;j<=3;j++){
+      const t=j/4,cx=dx*t*0.72,cz=dz*t*0.72,cy=0.08+Math.sin(t*Math.PI)*0.30,leaf=0.18*(1-t*0.48);
+      tri([cx,cy,cz],[cx+px*leaf,cy+0.05,cz+pz*leaf],[cx+dx*0.09,cy+0.08,cz+dz*0.09],1);
+      tri([cx,cy,cz],[cx-px*leaf,cy+0.05,cz-pz*leaf],[cx+dx*0.09,cy+0.08,cz+dz*0.09],1);
+    }
+  }
+  const mossRing:number[][]=[];
+  for(let i=0;i<7;i++){const a=i/7*Math.PI*2,r=0.62+(i%2)*0.08;mossRing.push([Math.cos(a)*r,0.10+(i%3)*0.025,Math.sin(a)*r]);}
+  for(let i=0;i<mossRing.length;i++)tri([0,0.30,0],mossRing[i],mossRing[(i+1)%mossRing.length],2);
+  const top=[0.05,0.48,0.02],bottom=[-0.03,0.02,-0.02];
+  const ring=[[0.62,0.20,0.05],[0.25,0.17,0.58],[-0.48,0.19,0.42],[-0.60,0.16,-0.28],[-0.12,0.22,-0.62],[0.48,0.16,-0.40]];
+  for(let i=0;i<ring.length;i++){tri(top,ring[i],ring[(i+1)%ring.length],3);tri(bottom,ring[(i+1)%ring.length],ring[i],3);}
+  return new Float32Array(out);
+}
+
 function buildTreeGeometry(): Float32Array {
   const out: number[] = [];
   const tri = (a:number[],b:number[],d:number[]) => {
@@ -243,6 +305,15 @@ export class TerrainPreviewRenderer {
   private readonly treeInstanceBuffer: WebGLBuffer;
   private readonly treeMvpLocation: WebGLUniformLocation;
   private treeVertexCount = 0;
+  private readonly groundProgram: WebGLProgram;
+  private readonly groundVao: WebGLVertexArrayObject;
+  private readonly groundGeometryBuffer: WebGLBuffer;
+  private readonly groundInstanceBuffer: WebGLBuffer;
+  private readonly groundMvpLocation: WebGLUniformLocation;
+  private readonly groundCameraLocation: WebGLUniformLocation;
+  private readonly groundRangeLocation: WebGLUniformLocation;
+  private groundVertexCount = 0;
+  private groundCount = 0;
   private treeCount = 0;
   private renderRequest = 0;
   private waterVertexCount = 0;
@@ -304,6 +375,27 @@ export class TerrainPreviewRenderer {
     gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,3,gl.FLOAT,false,20,0);gl.vertexAttribDivisor(2,1);
     gl.enableVertexAttribArray(3);gl.vertexAttribPointer(3,1,gl.FLOAT,false,20,12);gl.vertexAttribDivisor(3,1);
     gl.enableVertexAttribArray(4);gl.vertexAttribPointer(4,1,gl.FLOAT,false,20,16);gl.vertexAttribDivisor(4,1);
+    gl.bindVertexArray(null);
+    const groundVs=compile(gl,gl.VERTEX_SHADER,groundVertexSource),groundFs=compile(gl,gl.FRAGMENT_SHADER,groundFragmentSource);
+    const groundProgram=gl.createProgram();if(!groundProgram)throw new Error("ไม่สามารถสร้าง Ground Cover Program ได้");
+    gl.attachShader(groundProgram,groundVs);gl.attachShader(groundProgram,groundFs);gl.linkProgram(groundProgram);gl.deleteShader(groundVs);gl.deleteShader(groundFs);
+    if(!gl.getProgramParameter(groundProgram,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(groundProgram)??"Ground cover program link failed");
+    this.groundProgram=groundProgram;this.groundMvpLocation=gl.getUniformLocation(groundProgram,"uMvp")!;
+    this.groundCameraLocation=gl.getUniformLocation(groundProgram,"uCameraPosition")!;
+    this.groundRangeLocation=gl.getUniformLocation(groundProgram,"uRange")!;
+    const groundVao=gl.createVertexArray(),groundGeometry=gl.createBuffer(),groundInstances=gl.createBuffer();
+    if(!groundVao||!groundGeometry||!groundInstances)throw new Error("ไม่สามารถจองหน่วยความจำพืชพื้นได้");
+    this.groundVao=groundVao;this.groundGeometryBuffer=groundGeometry;this.groundInstanceBuffer=groundInstances;
+    const groundGeometryData=buildGroundCoverGeometry();this.groundVertexCount=groundGeometryData.length/7;
+    gl.bindVertexArray(groundVao);gl.bindBuffer(gl.ARRAY_BUFFER,groundGeometry);gl.bufferData(gl.ARRAY_BUFFER,groundGeometryData,gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,28,0);
+    gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,3,gl.FLOAT,false,28,12);
+    gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,1,gl.FLOAT,false,28,24);
+    gl.bindBuffer(gl.ARRAY_BUFFER,groundInstances);
+    gl.enableVertexAttribArray(3);gl.vertexAttribPointer(3,3,gl.FLOAT,false,24,0);gl.vertexAttribDivisor(3,1);
+    gl.enableVertexAttribArray(4);gl.vertexAttribPointer(4,1,gl.FLOAT,false,24,12);gl.vertexAttribDivisor(4,1);
+    gl.enableVertexAttribArray(5);gl.vertexAttribPointer(5,1,gl.FLOAT,false,24,16);gl.vertexAttribDivisor(5,1);
+    gl.enableVertexAttribArray(6);gl.vertexAttribPointer(6,1,gl.FLOAT,false,24,20);gl.vertexAttribDivisor(6,1);
     gl.bindVertexArray(null);
     gl.bindVertexArray(waterVao);gl.bindBuffer(gl.ARRAY_BUFFER,waterBuffer);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);gl.bindVertexArray(null);
 
@@ -449,6 +541,18 @@ export class TerrainPreviewRenderer {
     const data=new Float32Array(instances.length*5);
     for(let i=0;i<instances.length;i++){const item=instances[i],offset=i*5;data[offset]=item.x;data[offset+1]=item.y;data[offset+2]=item.z;data[offset+3]=item.height;data[offset+4]=item.tint;}
     this.treeCount=instances.length;this.gl.bindBuffer(this.gl.ARRAY_BUFFER,this.treeInstanceBuffer);this.gl.bufferData(this.gl.ARRAY_BUFFER,data,this.gl.DYNAMIC_DRAW);
+  }
+
+  setGroundCover(instances: readonly GroundCoverInstance[]): void {
+    const data=new Float32Array(instances.length*6);
+    for(let i=0;i<instances.length;i++){
+      const item=instances[i],offset=i*6;
+      data[offset]=item.x;data[offset+1]=item.y;data[offset+2]=item.z;
+      data[offset+3]=item.scale;data[offset+4]=item.tint;data[offset+5]=item.kind;
+    }
+    this.groundCount=instances.length;
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER,this.groundInstanceBuffer);
+    this.gl.bufferData(this.gl.ARRAY_BUFFER,data,this.gl.STATIC_DRAW);
   }
 
   setTerrain(field: Heightfield): void {
@@ -658,6 +762,12 @@ export class TerrainPreviewRenderer {
     }
     gl.bindVertexArray(null);
     if((this.mode==="world" || this.mode==="first-person") && this.treeCount>0){gl.useProgram(this.treeProgram);gl.uniformMatrix4fv(this.treeMvpLocation,false,mvp);gl.bindVertexArray(this.treeVao);gl.drawArraysInstanced(gl.TRIANGLES,0,this.treeVertexCount,this.treeCount);gl.bindVertexArray(null);}
+    if((this.mode==="world" || this.mode==="first-person") && this.groundCount>0){
+      gl.useProgram(this.groundProgram);gl.uniformMatrix4fv(this.groundMvpLocation,false,mvp);
+      gl.uniform3f(this.groundCameraLocation,camera[0],camera[1],camera[2]);
+      gl.uniform1f(this.groundRangeLocation,exploring?0.18:2.6);
+      gl.bindVertexArray(this.groundVao);gl.drawArraysInstanced(gl.TRIANGLES,0,this.groundVertexCount,this.groundCount);gl.bindVertexArray(null);
+    }
     if((this.mode==="world" || this.mode==="first-person") && this.waterVertexCount>0){
       gl.useProgram(this.waterProgram);gl.uniformMatrix4fv(this.waterMvpLocation,false,mvp);gl.bindVertexArray(this.waterVao);
       gl.disable(gl.CULL_FACE);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.drawArrays(gl.TRIANGLES,0,this.waterVertexCount);gl.disable(gl.BLEND);gl.enable(gl.CULL_FACE);gl.bindVertexArray(null);
@@ -677,5 +787,6 @@ export class TerrainPreviewRenderer {
     gl.deleteBuffer(this.waterBuffer);gl.deleteVertexArray(this.waterVao);gl.deleteProgram(this.waterProgram);
     if (this.renderRequest) window.cancelAnimationFrame(this.renderRequest);
     gl.deleteBuffer(this.treeGeometryBuffer);gl.deleteBuffer(this.treeInstanceBuffer);gl.deleteVertexArray(this.treeVao);gl.deleteProgram(this.treeProgram);
+    gl.deleteBuffer(this.groundGeometryBuffer);gl.deleteBuffer(this.groundInstanceBuffer);gl.deleteVertexArray(this.groundVao);gl.deleteProgram(this.groundProgram);
   }
 }
