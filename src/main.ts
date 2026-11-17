@@ -238,7 +238,8 @@ function renderGraphEditor(): void {
       card.dataset.nodeId = node.id; const pos = nodePosition(node.id, graphState.nodes.findIndex((item) => item.id === node.id)); card.style.left = pos.x + "px"; card.style.top = pos.y + "px";
       const heading = createElement("div", "editor-node-heading node-drag-handle");
       const identity = createElement("div", "editor-node-identity");
-      const categoryTitle: Record<string, string> = { NUMBER: "ตัวเลข", MATH: "คำนวณ", OUTPUT: "ผลลัพธ์", NODE: "เครื่องมือ" };\n      identity.append(createElement("span", "node-type", categoryTitle[info.category] ?? "เครื่องมือ"), createElement("strong", "editor-node-title", info.title), createElement("span", "node-id", node.id)); heading.append(identity);
+      const categoryTitle: Record<string, string> = { NUMBER: "ตัวเลข", MATH: "คำนวณ", OUTPUT: "ผลลัพธ์", NODE: "เครื่องมือ" };
+      identity.append(createElement("span", "node-type", categoryTitle[info.category] ?? "เครื่องมือ"), createElement("strong", "editor-node-title", info.title), createElement("span", "node-id", node.id)); heading.append(identity);
       const actions = createElement("div", "node-actions");
       if (!DEFAULT_NODE_IDS.has(node.id)) { const remove = createElement("button", "remove-node", "ลบ"); remove.type = "button"; remove.dataset.action = "remove-node"; remove.dataset.nodeId = node.id; actions.append(remove); }
       if (actions.childElementCount) heading.append(actions); card.append(heading);
