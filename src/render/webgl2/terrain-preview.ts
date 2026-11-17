@@ -315,6 +315,11 @@ export class TerrainPreviewRenderer {
   private groundVertexCount = 0;
   private groundCount = 0;
   private treeCount = 0;
+  private treeInstanceData = new Float32Array(0);
+  private treeVisibleData = new Float32Array(0);
+  private groundInstanceData = new Float32Array(0);
+  private groundVisibleData = new Float32Array(0);
+  private instanceBuffersCulled = false;
   private renderRequest = 0;
   private waterVertexCount = 0;
   private maximumAccumulation = 1;
@@ -540,7 +545,7 @@ export class TerrainPreviewRenderer {
   setVegetation(instances: readonly VegetationInstance[]): void {
     const data=new Float32Array(instances.length*5);
     for(let i=0;i<instances.length;i++){const item=instances[i],offset=i*5;data[offset]=item.x;data[offset+1]=item.y;data[offset+2]=item.z;data[offset+3]=item.height;data[offset+4]=item.tint;}
-    this.treeCount=instances.length;this.gl.bindBuffer(this.gl.ARRAY_BUFFER,this.treeInstanceBuffer);this.gl.bufferData(this.gl.ARRAY_BUFFER,data,this.gl.DYNAMIC_DRAW);
+    this.treeCount=instances.length;this.treeInstanceData=data;this.treeVisibleData=new Float32Array(data.length);this.instanceBuffersCulled=false;this.gl.bindBuffer(this.gl.ARRAY_BUFFER,this.treeInstanceBuffer);this.gl.bufferData(this.gl.ARRAY_BUFFER,data,this.gl.STATIC_DRAW);
   }
 
   setGroundCover(instances: readonly GroundCoverInstance[]): void {
@@ -550,7 +555,7 @@ export class TerrainPreviewRenderer {
       data[offset]=item.x;data[offset+1]=item.y;data[offset+2]=item.z;
       data[offset+3]=item.scale;data[offset+4]=item.tint;data[offset+5]=item.kind;
     }
-    this.groundCount=instances.length;
+    this.groundCount=instances.length;this.groundInstanceData=data;this.groundVisibleData=new Float32Array(data.length);this.instanceBuffersCulled=false;
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER,this.groundInstanceBuffer);
     this.gl.bufferData(this.gl.ARRAY_BUFFER,data,this.gl.STATIC_DRAW);
   }
@@ -760,12 +765,41 @@ export class TerrainPreviewRenderer {
       gl.drawElements(gl.TRIANGLES, this.triangleCount, gl.UNSIGNED_INT, 0);
     }
     gl.bindVertexArray(null);
-    if((this.mode==="world" || this.mode==="first-person") && this.treeCount>0){gl.useProgram(this.treeProgram);gl.uniformMatrix4fv(this.treeMvpLocation,false,mvp);gl.bindVertexArray(this.treeVao);gl.drawArraysInstanced(gl.TRIANGLES,0,this.treeVertexCount,this.treeCount);gl.bindVertexArray(null);}
-    if((this.mode==="world" || this.mode==="first-person") && this.groundCount>0){
+    let treeDrawCount=this.treeCount,groundDrawCount=this.groundCount;
+    if(exploring){
+      let treeCursor=0;
+      for(let i=0;i<this.treeCount;i++){
+        const source=i*5,dx=this.treeInstanceData[source]-camera[0],dz=this.treeInstanceData[source+2]-camera[2];
+        if(dx*dx+dz*dz>0.28*0.28)continue;
+        for(let j=0;j<5;j++)this.treeVisibleData[treeCursor++]=this.treeInstanceData[source+j];
+      }
+      treeDrawCount=treeCursor/5;
+      gl.bindBuffer(gl.ARRAY_BUFFER,this.treeInstanceBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER,this.treeVisibleData.subarray(0,treeCursor),gl.DYNAMIC_DRAW);
+      let groundCursor=0;
+      for(let i=0;i<this.groundCount;i++){
+        const source=i*6,dx=this.groundInstanceData[source]-camera[0],dz=this.groundInstanceData[source+2]-camera[2];
+        if(dx*dx+dz*dz>0.22*0.22)continue;
+        for(let j=0;j<6;j++)this.groundVisibleData[groundCursor++]=this.groundInstanceData[source+j];
+      }
+      groundDrawCount=groundCursor/6;
+      gl.bindBuffer(gl.ARRAY_BUFFER,this.groundInstanceBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER,this.groundVisibleData.subarray(0,groundCursor),gl.DYNAMIC_DRAW);
+      this.instanceBuffersCulled=true;
+    }else if(this.instanceBuffersCulled){
+      gl.bindBuffer(gl.ARRAY_BUFFER,this.treeInstanceBuffer);gl.bufferData(gl.ARRAY_BUFFER,this.treeInstanceData,gl.STATIC_DRAW);
+      gl.bindBuffer(gl.ARRAY_BUFFER,this.groundInstanceBuffer);gl.bufferData(gl.ARRAY_BUFFER,this.groundInstanceData,gl.STATIC_DRAW);
+      this.instanceBuffersCulled=false;
+    }
+    if((this.mode==="world" || this.mode==="first-person") && treeDrawCount>0){
+      gl.useProgram(this.treeProgram);gl.uniformMatrix4fv(this.treeMvpLocation,false,mvp);
+      gl.bindVertexArray(this.treeVao);gl.drawArraysInstanced(gl.TRIANGLES,0,this.treeVertexCount,treeDrawCount);gl.bindVertexArray(null);
+    }
+    if((this.mode==="world" || this.mode==="first-person") && groundDrawCount>0){
       gl.useProgram(this.groundProgram);gl.uniformMatrix4fv(this.groundMvpLocation,false,mvp);
       gl.uniform3f(this.groundCameraLocation,camera[0],camera[1],camera[2]);
-      gl.uniform1f(this.groundRangeLocation,exploring?0.18:2.6);
-      gl.bindVertexArray(this.groundVao);gl.drawArraysInstanced(gl.TRIANGLES,0,this.groundVertexCount,this.groundCount);gl.bindVertexArray(null);
+      gl.uniform1f(this.groundRangeLocation,exploring?0.22:2.6);
+      gl.bindVertexArray(this.groundVao);gl.drawArraysInstanced(gl.TRIANGLES,0,this.groundVertexCount,groundDrawCount);gl.bindVertexArray(null);
     }
     if((this.mode==="world" || this.mode==="first-person") && this.waterVertexCount>0){
       gl.useProgram(this.waterProgram);gl.uniformMatrix4fv(this.waterMvpLocation,false,mvp);gl.bindVertexArray(this.waterVao);
