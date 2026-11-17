@@ -168,3 +168,10 @@ input[type="range"] { display: block; width: 100%; height: 28px; margin: 0; acce
 .advanced-seed .field-label { margin-top: 12px; }
 .advanced-seed p { margin: 7px 0 0; color: #879b8d; font-size: 9px; }
 @media (max-width: 360px) { .landscape-presets { gap: 5px; } .landscape-preset { padding: 5px; } .landscape-preset strong { font-size: 9px; } }
+
+/* Plain-language labels in the advanced node workspace */
+.graph-toolbar-help { margin: 10px 0 7px; color: #91a498; font-size: 10px; line-height: 1.5; }
+.node-id { display: none; }
+.node-type { letter-spacing: 0; font-size: 9px; }
+.port-heading { letter-spacing: 0; font-size: 9px; }
+.graph-panel summary strong { font-size: 13px; }
