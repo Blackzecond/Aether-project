@@ -326,7 +326,8 @@ export class TerrainPreviewRenderer {
   private maximumAccumulation = 1;
   private vertexCount = 0;
   private surfaceVertexCount = 0;
-  private usesVolumeMesh = false;\n  private volumeChunks: readonly VolumeMeshChunk[] = [];
+  private usesVolumeMesh = false;
+  private volumeChunks: readonly VolumeMeshChunk[] = [];
   private triangleCount = 0;
   private lineCount = 0;
   private mode: TerrainViewMode = "world";
@@ -574,9 +575,11 @@ export class TerrainPreviewRenderer {
     field:Heightfield,
     mesh:{readonly positions:Float32Array;readonly normals:Float32Array;readonly indices:Uint32Array;readonly vertexCount:number},
     volume:boolean,
+    chunks:readonly VolumeMeshChunk[] = [],
   ):void {
     this.field=field;
-    this.usesVolumeMesh=volume;\n    this.volumeChunks=chunks;
+    this.usesVolumeMesh=volume;
+    this.volumeChunks=chunks;
     const gl=this.gl;
     this.vertexCount=mesh.vertexCount;
     this.surfaceVertexCount=field.width*field.height;
