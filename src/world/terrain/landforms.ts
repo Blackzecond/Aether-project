@@ -91,8 +91,8 @@ export function generateTerrain(recipe: TerrainRecipe): TerrainGeneration {
       const foothillNoise = fbmGradient2(x * 1.7, z * 1.7, seed + 3011, 3);
       const foothills = Math.pow(smoothstep(-0.28, 0.42, foothillNoise), 1.35) * 0.16;
       const detail = fbmGradient2(
-        x * detailFrequency,
-        z * detailFrequency,
+        x * landform.detailScale,
+        z * landform.detailScale,
         seed + 4001,
         landform.detailOctaves,
         0.52,
