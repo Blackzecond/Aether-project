@@ -7,6 +7,7 @@ import { createHeightfield } from "./fields/heightfield";
 import { buildDrainageField } from "./hydrology/drainage";
 import { extractRiverNetwork } from "./hydrology/rivers";
 import { generateVegetation } from "./ecology/vegetation";
+import { generateDensityWorld } from "./volume/density-world";
 function recipe(overrides: Partial<typeof DEFAULT_TERRAIN_RECIPE["landform"]> = {}) {
   return { ...DEFAULT_TERRAIN_RECIPE, landform: { ...DEFAULT_TERRAIN_RECIPE.landform, ...overrides } };
 }
@@ -82,6 +83,18 @@ describe("world foundation v2", () => {
     expect(Number.isFinite(mesh.positions[0])).toBe(true);
   });
 
+  it("generates a closed volumetric terrain mesh with Surface Nets",()=>{
+    const world=generateDensityWorld(recipe(),{width:28,height:20,depth:28});
+    expect(world.volume.values.length).toBe(28*20*28);
+    expect(world.mesh.vertexCount).toBeGreaterThan(0);
+    expect(world.mesh.triangleCount).toBeGreaterThan(0);
+    expect(world.mesh.indices.length%3).toBe(0);
+    expect(world.mesh.indices.reduce((m,v)=>Math.max(m,v),0)).toBeLessThan(world.mesh.vertexCount);
+    expect(Array.from(world.mesh.positions).every(Number.isFinite)).toBe(true);
+    expect(Array.from(world.mesh.normals).every(Number.isFinite)).toBe(true);
+    expect(world.heightfield.values.some(value=>value>0.05)).toBe(true);
+    expect(world.diagnostics.samples).toBe(world.volume.values.length);
+  });
   it("rejects unsafe recipes", () => {
     expect(() => validateTerrainRecipe({ ...recipe(), width: 900 })).toThrow();
   });
