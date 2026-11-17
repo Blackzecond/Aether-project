@@ -20,7 +20,7 @@
       <section class="intro">
         <p class="eyebrow">สร้างสรรค์จากระบบและคณิตศาสตร์</p>
         <h1>เริ่มจากสิ่งเล็ก ๆ</h1>
-        <p class="intro-copy">สร้างภูมิทัศน์ด้วยพารามิเตอร์และ Node Graph ที่ทำงานร่วมกัน</p>
+        <p class="intro-copy">เริ่มจากรูปแบบที่ชอบ แล้วค่อย ๆ ปรับภูมิทัศน์ในแบบของคุณ</p>
       </section>
 
       <section class="workspace" aria-label="พื้นที่สร้างภูมิทัศน์">
@@ -40,31 +40,64 @@
 
         <section class="controls-panel" aria-label="ตั้งค่าการสร้าง">
           <div class="section-heading">
-            <div><span class="eyebrow">ปรับแต่ง</span><h2>ภูมิทัศน์</h2></div>
-            <button id="randomize" class="quiet-button" type="button"><span aria-hidden="true">↻</span> สุ่มใหม่</button>
+            <div><span class="eyebrow">ปรับแต่งได้ทันที</span><h2>ออกแบบภูมิทัศน์</h2></div>
+            <button id="randomize" class="quiet-button" type="button"><span aria-hidden="true">↻</span> สุ่มภาพ</button>
           </div>
 
-          <label class="field-label" for="seed">Seed</label>
-          <input id="seed" class="seed-input" type="number" value="18273" inputmode="numeric" />
+          <div class="preset-heading">
+            <strong>เริ่มจากรูปแบบที่ชอบ</strong>
+            <span>เลือกแบบหนึ่ง แล้วปรับต่อได้</span>
+          </div>
+          <div class="landscape-presets" role="group" aria-label="รูปแบบภูมิทัศน์เริ่มต้น">
+            <button class="landscape-preset is-active" type="button" data-preset="soft">
+              <span class="preset-art preset-art-soft" aria-hidden="true"></span>
+              <strong>ภูเขานุ่มนวล</strong>
+              <small>เนินลาด รายละเอียดน้อย</small>
+            </button>
+            <button class="landscape-preset" type="button" data-preset="rugged">
+              <span class="preset-art preset-art-rugged" aria-hidden="true"></span>
+              <strong>สันเขาคมชัด</strong>
+              <small>พื้นผิวขรุขระมากขึ้น</small>
+            </button>
+            <button class="landscape-preset" type="button" data-preset="detailed">
+              <span class="preset-art preset-art-detailed" aria-hidden="true"></span>
+              <strong>ภูเขาละเอียด</strong>
+              <small>เพิ่มชั้นรายละเอียด</small>
+            </button>
+          </div>
 
-          <label class="field-label" for="scale">ขนาดภูมิประเทศ <output id="scale-value">1.2</output></label>
-          <input id="scale" type="range" min="0.5" max="2.4" step="0.1" value="1.2" />
+          <div class="friendly-control">
+            <label class="field-label" for="scale">รูปทรงของภูเขา <output id="scale-value">1.2</output></label>
+            <p>ปรับจากเนินกว้าง ๆ ไปจนถึงแนวเขาที่ถี่และซับซ้อน</p>
+            <input id="scale" type="range" min="0.5" max="2.4" step="0.1" value="1.2" />
+          </div>
+          <div class="friendly-control">
+            <label class="field-label" for="roughness">ความขรุขระของสันเขา <output id="roughness-value">0.55</output></label>
+            <p>ค่าน้อยจะดูเรียบ ค่ามากจะมีสันและร่องชัดขึ้น</p>
+            <input id="roughness" type="range" min="0.15" max="0.85" step="0.05" value="0.55" />
+          </div>
+          <div class="friendly-control">
+            <label class="field-label" for="detail">จำนวนรายละเอียด <output id="detail-value">4</output></label>
+            <p>เพิ่มชั้นความซับซ้อนให้รูปทรงภูเขา</p>
+            <input id="detail" type="range" min="1" max="6" step="1" value="4" />
+          </div>
 
-          <label class="field-label" for="roughness">ความขรุขระ <output id="roughness-value">0.55</output></label>
-          <input id="roughness" type="range" min="0.15" max="0.85" step="0.05" value="0.55" />
+          <details class="advanced-seed">
+            <summary>ตั้งค่ารูปแบบสุ่มเพิ่มเติม</summary>
+            <label class="field-label" for="seed">รหัสรูปแบบ</label>
+            <input id="seed" class="seed-input" type="number" value="18273" inputmode="numeric" />
+            <p>ใช้รหัสเดิมเพื่อสร้างรูปแบบเดิมอีกครั้ง</p>
+          </details>
 
-          <label class="field-label" for="detail">รายละเอียด <output id="detail-value">4</output></label>
-          <input id="detail" type="range" min="1" max="6" step="1" value="4" />
-
-          <button id="regenerate" class="primary-button" type="button">สร้างภูมิทัศน์ใหม่ <span aria-hidden="true">↗</span></button>
+          <button id="regenerate" class="primary-button" type="button">อัปเดตภาพตัวอย่าง <span aria-hidden="true">↗</span></button>
         </section>
 
         <details class="graph-panel" id="graph-panel">
           <summary>
-            <span><span class="eyebrow">ระบบเบื้องหลัง</span><strong>Node Graph</strong></span>
+            <span><span class="eyebrow">สำหรับผู้ที่อยากควบคุมละเอียด</span><strong>เครื่องมือสร้างแบบ Node</strong></span>
             <span class="summary-meta"><span id="graph-count">4 NODES · 3 LINKS</span> <span class="chevron">⌄</span></span>
           </summary>
-          <p class="graph-description">Node คือชุดคำสั่งที่ส่งค่าต่อกันไปยัง Landscape Generator เช่น Number → Math → Output ค่าที่ส่งออกจะแสดงใต้ Node และภาพตัวอย่างจะอัปเดตทันทีเมื่อแก้ตัวเลข</p>
+          <p class="graph-description">ส่วนนี้เป็นเครื่องมือขั้นสูง สำหรับนำค่ามาคำนวณและเชื่อมต่อกันเพื่อควบคุมผลงาน ผู้เริ่มต้นสามารถใช้งานแผงปรับแต่งด้านบนได้โดยไม่ต้องเปิดส่วนนี้</p>
           <div class="graph-file-toolbar">
             <button id="export-graph" class="quiet-button" type="button">ส่งออก JSON ↓</button>
             <button id="import-graph" class="quiet-button" type="button">นำเข้า JSON ↑</button>
@@ -72,12 +105,12 @@
           </div>
           <div class="graph-toolbar">
             <select id="node-type" aria-label="ประเภท Node ที่ต้องการเพิ่ม">
-              <option value="number.constant">Number · ค่าคงที่</option>
-              <option value="math.add">Math · บวก</option>
-              <option value="math.multiply">Math · คูณ</option>
-              <option value="math.clamp">Math · จำกัดช่วง</option>
+              <option value="number.constant">ค่าตัวเลข · กำหนดค่าเอง</option>
+              <option value="math.add">คำนวณ · บวกตัวเลข</option>
+              <option value="math.multiply">คำนวณ · คูณตัวเลข</option>
+              <option value="math.clamp">คำนวณ · จำกัดช่วงค่า</option>
             </select>
-            <button id="add-node" class="quiet-button" type="button">+ เพิ่ม Node</button>
+            <button id="add-node" class="quiet-button" type="button">+ เพิ่มเครื่องมือคำนวณ</button>
           </div>
           <div class="graph-organize-toolbar">
             <input id="graph-search" type="search" placeholder="ค้นหา Node หรือชนิด..." aria-label="ค้นหา Node" />
@@ -98,7 +131,7 @@
           <p id="graph-status" class="graph-status" role="status">พร้อมใช้งาน · บันทึก Graph ในเครื่องอัตโนมัติ</p>
           <div id="graph-viewport" class="graph-viewport" aria-label="พื้นที่ Node Graph แบบอิสระ"></div>
           <button id="reset-graph" class="reset-graph-button" type="button">คืนค่า Graph เริ่มต้น</button>
-          <p class="graph-footnote">บันทึกในเครื่องอัตโนมัติ · ส่งออกหรือนำเข้า JSON เพื่อย้าย Graph · ลาก Node เพื่อจัดวาง · ซูมและเลื่อนพื้นที่ได้</p>
+          <p class="graph-footnote">การเปลี่ยนแปลงจะบันทึกในเครื่องอัตโนมัติ · ลากการ์ดเพื่อจัดวาง · เชื่อมช่องส่งกับช่องรับเพื่อส่งค่าระหว่างเครื่องมือ</p>
         </details>
       </section>
 
