@@ -49,9 +49,11 @@ This phase adds a renderer-independent hydrology field derived from the authorit
 - D8 is the initial routing model; it can create angular or grid-biased channels.
 - Every boundary cell is currently an outlet. Later work may group outlets or use a sea-level mask.
 - Channel extraction is threshold-based and D8 inherits grid-direction bias.
-- No channel incision, water surface or visual debug overlay is included yet.
+- No channel incision or water surface is included. The diagnostic overlay is a view of derived data only; it does not alter terrain.
 - Priority-Flood is drainage preprocessing, not a fluid simulation.
 
-## Next
+## Diagnostic view
 
-Next: validate the channel graph visually with a flow-accumulation/channel debug view. Only after review should channel incision and a water surface be implemented as separate derived stages.
+Terrain Lab now includes a `การไหลและลำน้ำ` view. It shades the heightfield by logarithmic contributing-cell accumulation (blue through yellow) and overlays extracted channel cells in gold. The view reports channel-cell count, headwaters, outlets and maximum accumulation. Hydrology is computed only when this view is selected and is refreshed after terrain controls settle.
+
+This is a diagnostic visualization, not visual acceptance: deployment is currently blocked by the Vercel build-rate limit, so the view still needs review on the target device. Do not implement channel incision or a water surface until terrain and routing have been visually reviewed.
