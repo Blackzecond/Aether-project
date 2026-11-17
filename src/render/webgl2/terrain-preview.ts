@@ -778,14 +778,19 @@ export class TerrainPreviewRenderer {
       gl.drawElements(gl.LINES, this.lineCount, gl.UNSIGNED_INT, 0);
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
       gl.enable(gl.CULL_FACE);
-    } else if(exploring&&activeLod&&activeLod.chunks.length>0){
-      const rangeSquared=0.42*0.42;
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,activeLod.indexBuffer);
-      for(const chunk of activeLod.chunks){
-        const dx=chunk.centerX-camera[0],dz=chunk.centerZ-camera[2];
-        if(dx*dx+dz*dz>rangeSquared)continue;
-        gl.drawElements(gl.TRIANGLES,chunk.indexCount,gl.UNSIGNED_INT,chunk.startIndex*Uint32Array.BYTES_PER_ELEMENT);
+    } else if(exploring&&this.volumeLodGpu.length>0){
+      const rings=[0.20,0.40,0.62];
+      for(let level=0;level<Math.min(3,this.volumeLodGpu.length);level++){
+        const lod=this.volumeLodGpu[level],inner=rings[level]??rings[rings.length-1];
+        const outer=rings[level+1]??rings[rings.length-1],innerSquared=level===0?0:inner*inner,outerSquared=outer*outer;
+        gl.bindVertexArray(lod.vao);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,lod.indexBuffer);
+        for(const chunk of lod.chunks){
+          const dx=chunk.centerX-camera[0],dz=chunk.centerZ-camera[2],distanceSquared=dx*dx+dz*dz;
+          if(distanceSquared<innerSquared||distanceSquared>outerSquared)continue;
+          gl.drawElements(gl.TRIANGLES,chunk.indexCount,gl.UNSIGNED_INT,chunk.startIndex*Uint32Array.BYTES_PER_ELEMENT);
+        }
       }
+      gl.bindVertexArray(this.volumeLodGpu[0].vao);
     } else {
       if(activeLod)gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,activeLod.indexBuffer);
       gl.drawElements(gl.TRIANGLES,activeLod?.indexCount??this.triangleCount,gl.UNSIGNED_INT,0);
