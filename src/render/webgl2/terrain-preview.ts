@@ -637,7 +637,6 @@ export class TerrainPreviewRenderer {
     const water:number[]=[];
     const px=(index:number)=>field.bounds.minX+(index%field.width)/(field.width-1)*(field.bounds.maxX-field.bounds.minX);
     const pz=(index:number)=>field.bounds.minZ+Math.floor(index/field.width)/(field.height-1)*(field.bounds.maxZ-field.bounds.minZ);
-    const py=(index:number)=>field.values[index]*1.18+0.014;
     const renderedSegments=new Set<string>();
     const point=(index:number)=>({
       x:px(index),z:pz(index),w:Math.max(rivers.width[index]*0.5,0.0015),
