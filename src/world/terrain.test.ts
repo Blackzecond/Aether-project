@@ -89,6 +89,11 @@ describe("world foundation v2", () => {
     expect(world.mesh.vertexCount).toBeGreaterThan(0);
     expect(world.mesh.triangleCount).toBeGreaterThan(0);
     expect(world.mesh.indices.length%3).toBe(0);
+    expect(world.mesh.lods).toHaveLength(3);
+    expect(world.mesh.lods[0].vertexCount).toBe(world.mesh.vertexCount);
+    expect(world.mesh.lods[1].vertexCount).toBeLessThan(world.mesh.lods[0].vertexCount);
+    expect(world.mesh.lods[2].vertexCount).toBeLessThan(world.mesh.lods[1].vertexCount);
+    expect(world.mesh.lods.every(lod=>lod.indices.length%3===0&&lod.chunks.length>0)).toBe(true);
     expect(world.mesh.chunks.length).toBeGreaterThan(0);
     expect(world.mesh.chunks.reduce((sum,chunk)=>sum+chunk.indexCount,0)).toBe(world.mesh.indices.length);
     expect(world.mesh.chunks.every(chunk=>chunk.startIndex>=0&&chunk.indexCount>0
