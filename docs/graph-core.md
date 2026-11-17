@@ -14,8 +14,13 @@ The first Graph Core milestone provides a small, renderer-independent execution 
 
 - The graph model has no dependency on Canvas, WebGL, WebGPU, or a UI framework.
 - Evaluation is synchronous for now; costly procedural work should later use a worker adapter.
-- The engine does not yet include editor state, visual layout, serialization/version migration, caching, or async nodes.
+- The engine does not yet include editor state, visual layout, caching, or async nodes.
+- Versioned JSON serialization is provided separately by `graph-document.ts`; version 1 validates document structure, limits resource use, and rejects executable/unknown fields.
 - Graph values are JSON-like so documents can be saved and moved between visual editor and parameter/code modes.
+
+## Validation and interchange
+
+Run `npm run test` to execute graph-engine and document-format tests. The interchange format is documented in [Graph Document Format](./graph-document-format.md).
 
 ## Example
 
