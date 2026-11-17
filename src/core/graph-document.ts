@@ -93,11 +93,16 @@ function validateDocument(value: unknown): GraphDocument {
     const id = readId(item.id, label + ".id");
     if (edgeIds.has(id)) throw new GraphDocumentFormatError("Duplicate edge id: " + id);
     edgeIds.add(id);
+    const fromNodeId = readId(item.fromNodeId, label + ".fromNodeId");
+    const toNodeId = readId(item.toNodeId, label + ".toNodeId");
+    if (!nodeIds.has(fromNodeId) || !nodeIds.has(toNodeId)) {
+      throw new GraphDocumentFormatError(label + " references a node that does not exist.");
+    }
     return {
       id,
-      fromNodeId: readId(item.fromNodeId, label + ".fromNodeId"),
+      fromNodeId,
       fromPort: readId(item.fromPort, label + ".fromPort"),
-      toNodeId: readId(item.toNodeId, label + ".toNodeId"),
+      toNodeId,
       toPort: readId(item.toPort, label + ".toPort"),
     };
   });
@@ -121,17 +126,18 @@ export function parseGraphDocument(source: string): GraphDocument {
 
 /** Serialize a graph using the current versioned interchange format. */
 export function serializeGraphDocument(graph: GraphDocument): string {
-  let source: string;
+  const normalized = validateDocument({
+    version: GRAPH_DOCUMENT_VERSION,
+    nodes: graph.nodes,
+    edges: graph.edges,
+  });
   try {
-    source = JSON.stringify({ version: GRAPH_DOCUMENT_VERSION, nodes: graph.nodes, edges: graph.edges });
+    return JSON.stringify({
+      version: GRAPH_DOCUMENT_VERSION,
+      nodes: normalized.nodes,
+      edges: normalized.edges,
+    }, null, 2);
   } catch {
     throw new GraphDocumentFormatError("Graph document could not be serialized.");
   }
-  if (source === undefined) throw new GraphDocumentFormatError("Graph document could not be serialized.");
-  const normalized = validateDocument(JSON.parse(source) as unknown);
-  return JSON.stringify({
-    version: GRAPH_DOCUMENT_VERSION,
-    nodes: normalized.nodes,
-    edges: normalized.edges,
-  }, null, 2);
 }
