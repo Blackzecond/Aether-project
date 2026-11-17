@@ -92,18 +92,34 @@ export function generateDensityWorld(recipe:TerrainRecipe,resolution:DensityReso
       const wy=origin.y+y*voxelSize.y;
       for(let x=0;x<width;x++){
         const wx=origin.x+x*voxelSize.x,baseHeight=plane[z*width+x];
-        const warpX=fbm3(wx*7.5,wy*8.5,wz*7.5,recipe.seed+71,2)*0.025;
-        const warpY=fbm3(wx*7.5+13,wy*8.5,wz*7.5-9,recipe.seed+97,2)*0.012;
-        const warpZ=fbm3(wx*7.5-7,wy*8.5+5,wz*7.5+11,recipe.seed+131,2)*0.025;
-        const qx=wx+warpX,qy=wy+warpY,qz=wz+warpZ;
+        const baseDensity=baseHeight-wy;
         const rockMask=clamp((baseHeight-0.055)/0.22,0,1);
-        const broadNoise=fbm3(qx*12,qy*16,qz*12,recipe.seed+211,3);
-        const cellular=worley3(qx*27+3,qy*31-5,qz*27+9,recipe.seed+307);
-        const fineCell=worley3(qx*54-7,qy*61+2,qz*54+4,recipe.seed+401);
-        const erosion=(0.0045*(0.5-cellular)+0.0018*(0.5-fineCell)+broadNoise*0.004)*rockMask;
-        let density=baseHeight-wy+erosion;
-        for(const rock of rocks)density=smoothMax(density,ellipsoidDensity(wx,wy,wz,rock),rock.blend);
-        for(const cave of caves)density=smoothMin(density,capsuleDistance(wx,wy,wz,cave),0.018);
+        let erosion=0;
+        // High-frequency 3D weathering is evaluated only in a narrow band
+        // around the zero surface; deep solid and empty samples need no detail.
+        if(Math.abs(baseDensity)<0.085&&rockMask>0.02){
+          const warpX=fbm3(wx*7.5,wy*8.5,wz*7.5,recipe.seed+71,2)*0.025;
+          const warpY=fbm3(wx*7.5+13,wy*8.5,wz*7.5-9,recipe.seed+97,2)*0.012;
+          const warpZ=fbm3(wx*7.5-7,wy*8.5+5,wz*7.5+11,recipe.seed+131,2)*0.025;
+          const qx=wx+warpX,qy=wy+warpY,qz=wz+warpZ;
+          const broadNoise=fbm3(qx*12,qy*16,qz*12,recipe.seed+211,3);
+          const cellular=worley3(qx*27+3,qy*31-5,qz*27+9,recipe.seed+307);
+          const fineCell=worley3(qx*54-7,qy*61+2,qz*54+4,recipe.seed+401);
+          erosion=(0.0045*(0.5-cellular)+0.0018*(0.5-fineCell)+broadNoise*0.004)*rockMask;
+        }
+        let density=baseDensity+erosion;
+        for(const rock of rocks){
+          if(Math.abs(wx-rock.x)<rock.rx*1.5&&Math.abs(wy-rock.y)<rock.ry*1.5&&Math.abs(wz-rock.z)<rock.rz*1.5){
+            density=smoothMax(density,ellipsoidDensity(wx,wy,wz,rock),rock.blend);
+          }
+        }
+        for(const cave of caves){
+          if(wy>=Math.min(cave.ay,cave.by)-cave.radius&&wy<=Math.max(cave.ay,cave.by)+cave.radius
+            &&wx>=Math.min(cave.ax,cave.bx)-cave.radius&&wx<=Math.max(cave.ax,cave.bx)+cave.radius
+            &&wz>=Math.min(cave.az,cave.bz)-cave.radius&&wz<=Math.max(cave.az,cave.bz)+cave.radius){
+            density=smoothMin(density,capsuleDistance(wx,wy,wz,cave),0.018);
+          }
+        }
         if(x===0||z===0||x===width-1||z===depth-1||y===0||y===height-1)density=-0.08;
         const value=Math.fround(density);values[index(x,y,z)]=value;if(value>0)occupiedSamples++;
       }
