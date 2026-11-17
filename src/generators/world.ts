@@ -178,23 +178,16 @@ function buildRiver(
   width: number,
   height: number,
   strength: number,
+  seed: number,
 ): RiverPoint[] {
   if (strength <= 0.01) return [];
-  let source = -1;
-  let sourceScore = -Infinity;
-  const maxAccumulation = Math.max(...Array.from(accumulation));
-  for (let z = 3; z < 18; z += 1) {
-    for (let x = 12; x < FIELD_WIDTH - 12; x += 1) {
-      const index = indexOf(x, z);
-      const score = accumulation[index] * 0.8 + elevation[index] * 90;
-      if (score > sourceScore) {
-        sourceScore = score;
-        source = index;
-      }
-    }
-  }
-  if (source < 0) return [];
-
+  // The headwater anchor is seed-stable. It sits on one of the three
+  // highland spines, so terrain edits reshape its downstream route without
+  // making the river jump to an unrelated mountain.
+  const ridgeAnchors = [0.19, 0.51, 0.82];
+  const ridgeIndex = Math.abs(Math.floor(seed)) % ridgeAnchors.length;
+  const sourceX = Math.round(ridgeAnchors[ridgeIndex] * (FIELD_WIDTH - 1));
+  let source = indexOf(sourceX, 5);
   const route: number[] = [];
   const seen = new Uint8Array(FIELD_WIDTH * FIELD_HEIGHT);
   let current = source;
@@ -206,11 +199,35 @@ function buildRiver(
   }
   if (route.length < 8) return [];
 
-  return route.map((index) => {
-    const x = (index % FIELD_WIDTH) / (FIELD_WIDTH - 1);
-    const z = Math.floor(index / FIELD_WIDTH) / (FIELD_HEIGHT - 1);
-    const flow = accumulation[index] / maxAccumulation;
-    const point = projectPoint(x, z, elevation[index], width, height);
+  let coordinates = route.map((index) => ({
+    x: index % FIELD_WIDTH,
+    z: Math.floor(index / FIELD_WIDTH),
+  }));
+  for (let pass = 0; pass < 2; pass += 1) {
+    const smoothed = coordinates.map((point, i) => {
+      if (i === 0 || i === coordinates.length - 1) return point;
+      return {
+        x: coordinates[i - 1].x * 0.22 + point.x * 0.56 + coordinates[i + 1].x * 0.22,
+        z: coordinates[i - 1].z * 0.22 + point.z * 0.56 + coordinates[i + 1].z * 0.22,
+      };
+    });
+    coordinates = smoothed;
+  }
+
+  return coordinates.map((coordinate, i) => {
+    const x = coordinate.x / (FIELD_WIDTH - 1);
+    const z = coordinate.z / (FIELD_HEIGHT - 1);
+    const gx = clamp(coordinate.x, 0, FIELD_WIDTH - 1);
+    const gz = clamp(coordinate.z, 0, FIELD_HEIGHT - 1);
+    const x0 = Math.floor(gx), z0 = Math.floor(gz);
+    const x1 = Math.min(FIELD_WIDTH - 1, x0 + 1), z1 = Math.min(FIELD_HEIGHT - 1, z0 + 1);
+    const tx = gx - x0, tz = gz - z0;
+    const top = elevation[indexOf(x0, z0)] * (1 - tx) + elevation[indexOf(x1, z0)] * tx;
+    const bottom = elevation[indexOf(x0, z1)] * (1 - tx) + elevation[indexOf(x1, z1)] * tx;
+    const localElevation = top * (1 - tz) + bottom * tz;
+    const sourceIndex = route[i];
+    const flow = accumulation[sourceIndex] / maxAccumulation;
+    const point = projectPoint(x, z, localElevation, width, height);
     const perspective = 0.55 + z * 1.05;
     const radius = width * (0.0012 + Math.pow(flow, 0.42) * 0.012) * perspective * strength;
     return { ...point, width: radius, depth: z, flow };
@@ -247,7 +264,7 @@ export function createLandscapeWorld(width: number, height: number, options: Lan
     return { ...settings, surface, elevation: layerElevation };
   });
 
-  const river = buildRiver(elevation, hydrology.accumulation, hydrology.parent, width, height, clamp(options.water, 0, 1));
+  const river = buildRiver(elevation, hydrology.accumulation, hydrology.parent, width, height, clamp(options.water, 0, 1), options.seed);
   return {
     width, height, layers, river,
     fieldWidth: FIELD_WIDTH,
