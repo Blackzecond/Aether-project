@@ -159,6 +159,8 @@ export class TerrainPreviewRenderer {
   private azimuth = 0.76;
   private elevation = 0.58;
   private distance = 4.35;
+  private fitDistance = 4.35;
+  private cameraTarget = [0, 0.34, 0];
   private readonly mvpLocation: WebGLUniformLocation;
   private readonly modelLocation: WebGLUniformLocation;
   private readonly modeLocation: WebGLUniformLocation;
@@ -220,7 +222,7 @@ export class TerrainPreviewRenderer {
       this.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
       if (this.pointers.size >= 2) {
         const nextPinch = this.pinchDistance();
-        if (this.previousPinch > 0 && nextPinch > 0) this.distance = Math.max(2.4, Math.min(8, this.distance * this.previousPinch / nextPinch));
+        if (this.previousPinch > 0 && nextPinch > 0) this.distance = Math.max(this.fitDistance * 0.58, Math.min(this.fitDistance * 2.2, this.distance * this.previousPinch / nextPinch));
         this.previousPinch = nextPinch;
       } else {
         this.azimuth -= dx * 0.008;
@@ -237,7 +239,7 @@ export class TerrainPreviewRenderer {
     this.canvas.addEventListener("lostpointercapture", release);
     this.canvas.addEventListener("wheel", event => {
       event.preventDefault();
-      this.distance = Math.max(2.4, Math.min(8, this.distance * Math.exp(event.deltaY * 0.001)));
+      this.distance = Math.max(this.fitDistance * 0.58, Math.min(this.fitDistance * 2.2, this.distance * Math.exp(event.deltaY * 0.001)));
       this.render();
     }, { passive: false });
   }
@@ -251,7 +253,7 @@ export class TerrainPreviewRenderer {
   resetCamera(): void {
     this.azimuth = 0.76;
     this.elevation = 0.58;
-    this.distance = 4.35;
+    this.distance = this.fitDistance;
     this.render();
   }
 
@@ -260,6 +262,31 @@ export class TerrainPreviewRenderer {
   setTerrain(field: Heightfield): void {
     const gl = this.gl;
     const mesh = buildHeightfieldMesh(field, 1.18);
+    let minHeight = Infinity;
+    let maxHeight = -Infinity;
+    for (const value of field.values) {
+      minHeight = Math.min(minHeight, value);
+      maxHeight = Math.max(maxHeight, value);
+    }
+    const baseY = minHeight * 1.18 - 0.18;
+    const maxY = maxHeight * 1.18;
+    this.cameraTarget = [
+      (field.bounds.minX + field.bounds.maxX) * 0.5,
+      (baseY + maxY) * 0.5,
+      (field.bounds.minZ + field.bounds.maxZ) * 0.5,
+    ];
+    const rect = this.canvas.getBoundingClientRect();
+    const aspect = rect.width / Math.max(1, rect.height);
+    const verticalFov = 0.72;
+    const horizontalFov = 2 * Math.atan(Math.tan(verticalFov * 0.5) * aspect);
+    const limitingFov = Math.min(verticalFov, horizontalFov);
+    const radius = Math.hypot(
+      (field.bounds.maxX - field.bounds.minX) * 0.5,
+      (maxY - baseY) * 0.5,
+      (field.bounds.maxZ - field.bounds.minZ) * 0.5,
+    );
+    this.fitDistance = Math.max(2.4, Math.min(8, radius / Math.sin(limitingFov * 0.5) * 1.12));
+    this.distance = this.fitDistance;
     const lines = new Uint32Array((field.width - 1) * field.height * 2 + (field.height - 1) * field.width * 2);
     let cursor = 0;
     for (let z = 0; z < field.height; z += 1) {
@@ -314,14 +341,13 @@ export class TerrainPreviewRenderer {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.useProgram(this.program);
 
-    const target = [0, 0.34, 0];
     const horizontal = Math.cos(this.elevation) * this.distance;
     const camera = [
-      target[0] + Math.sin(this.azimuth) * horizontal,
-      target[1] + Math.sin(this.elevation) * this.distance,
-      target[2] + Math.cos(this.azimuth) * horizontal,
+      this.cameraTarget[0] + Math.sin(this.azimuth) * horizontal,
+      this.cameraTarget[1] + Math.sin(this.elevation) * this.distance,
+      this.cameraTarget[2] + Math.cos(this.azimuth) * horizontal,
     ];
-    const view = lookAt(camera, target, [0, 1, 0]);
+    const view = lookAt(camera, this.cameraTarget, [0, 1, 0]);
     const projection = perspective(0.72, this.canvas.width / Math.max(1, this.canvas.height), 0.1, 24);
     const mvp = multiply(projection, view);
     const model = new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
