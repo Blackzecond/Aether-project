@@ -55,15 +55,22 @@ export async function generateDensityWorldGpu(
     const heights=device.createBuffer({size:plane.byteLength,usage:usage.STORAGE|usage.COPY_DST});
     const output=device.createBuffer({size:total*4,usage:usage.STORAGE|usage.COPY_SRC});
     const params=new Float32Array([width,height,depth,width,depth,origin.x,origin.y,origin.z,voxelSize.x,voxelSize.y,voxelSize.z,recipe.seed]);
-    const config=device.createBuffer({size:params.byteLength,usage:usage.STORAGE|usage.COPY_DST});\n    const features=device.createBuffer({size:featureData.byteLength,usage:usage.STORAGE|usage.COPY_DST});
+    const config=device.createBuffer({size:params.byteLength,usage:usage.STORAGE|usage.COPY_DST});
+    const features=device.createBuffer({size:featureData.byteLength,usage:usage.STORAGE|usage.COPY_DST});
     const readback=device.createBuffer({size:total*4,usage:usage.MAP_READ|usage.COPY_DST});
     device.queue.writeBuffer(heights,0,plane);
-    device.queue.writeBuffer(config,0,params);\n    device.queue.writeBuffer(features,0,featureData);
+    device.queue.writeBuffer(config,0,params);
+    device.queue.writeBuffer(features,0,featureData);
     const shader=device.createShaderModule({code:`
       struct Params { data:array<f32> };
       @group(0) @binding(0) var<storage,read> ground:array<f32>;
       @group(0) @binding(1) var<storage,read_write> density:array<f32>;
-      @group(0) @binding(2) var<storage,read> p:Params;\n      @group(0) @binding(3) var<storage,read> features:array<vec4<f32>>;\n      fn smoothMax(a:f32,b:f32,k:f32)->f32{let h=max(k-abs(a-b),0.0)/k;return max(a,b)+h*h*k*0.25;}\n      fn smoothMin(a:f32,b:f32,k:f32)->f32{return -smoothMax(-a,-b,k);}\n      fn ellipsoid(pos:vec3<f32>,center:vec3<f32>,radii:vec3<f32>)->f32{let q=(pos-center)/radii;let k0=length(q);let k1=length(q/radii);return select(min(radii.x,min(radii.y,radii.z)),(1.0-k0)/k1,k1>0.000001);}\n      fn capsule(pos:vec3<f32>,a:vec3<f32>,b:vec3<f32>,radius:f32)->f32{let ab=b-a;let t=clamp(dot(pos-a,ab)/(dot(ab,ab)+0.000001),0.0,1.0);return length(pos-a-ab*t)-radius;}
+      @group(0) @binding(2) var<storage,read> p:Params;
+      @group(0) @binding(3) var<storage,read> features:array<vec4<f32>>;
+      fn smoothMax(a:f32,b:f32,k:f32)->f32{let h=max(k-abs(a-b),0.0)/k;return max(a,b)+h*h*k*0.25;}
+      fn smoothMin(a:f32,b:f32,k:f32)->f32{return -smoothMax(-a,-b,k);}
+      fn ellipsoid(pos:vec3<f32>,center:vec3<f32>,radii:vec3<f32>)->f32{let q=(pos-center)/radii;let k0=length(q);let k1=length(q/radii);return select(min(radii.x,min(radii.y,radii.z)),(1.0-k0)/k1,k1>0.000001);}
+      fn capsule(pos:vec3<f32>,a:vec3<f32>,b:vec3<f32>,radius:f32)->f32{let ab=b-a;let t=clamp(dot(pos-a,ab)/(dot(ab,ab)+0.000001),0.0,1.0);return length(pos-a-ab*t)-radius;}
       fn hash3(v:vec3<f32>)->f32{
         return fract(sin(dot(v,vec3<f32>(127.1,311.7,74.7))+p.data[11]*0.001)*43758.5453);
       }
