@@ -24,6 +24,7 @@ const roughnessInput = requiredElement<HTMLInputElement>("#roughness");
 const detailInput = requiredElement<HTMLInputElement>("#detail");
 const mistInput = requiredElement<HTMLInputElement>("#mist");
 const forestInput = requiredElement<HTMLInputElement>("#forest-density");
+const waterInput = requiredElement<HTMLInputElement>("#water");
 const renderStatus = requiredElement<HTMLElement>("#render-status");
 const seedLabel = requiredElement<HTMLElement>("#seed-label");
 const resolutionLabel = requiredElement<HTMLElement>("#resolution-label");
@@ -43,14 +44,15 @@ const context = (() => {
 
 const outputDefinition: GraphNodeDefinition = {
   type: "landscape.compose",
-  inputs: ["scale", "roughness", "octaves", "mist", "forest"],
-  outputs: ["scale", "roughness", "octaves", "mist", "forest"],
+  inputs: ["scale", "roughness", "octaves", "mist", "forest", "water"],
+  outputs: ["scale", "roughness", "octaves", "mist", "forest", "water"],
   evaluate: (inputs) => ({
     scale: typeof inputs.scale === "number" ? inputs.scale : Number(scaleInput.value),
     roughness: typeof inputs.roughness === "number" ? inputs.roughness : Number(roughnessInput.value),
     octaves: typeof inputs.octaves === "number" ? inputs.octaves : Number(detailInput.value),
     mist: typeof inputs.mist === "number" ? inputs.mist : Number(mistInput.value),
     forest: typeof inputs.forest === "number" ? inputs.forest : Number(forestInput.value),
+    water: typeof inputs.water === "number" ? inputs.water : Number(waterInput.value),
   }),
 };
 const registry = new Map(createCoreNodeRegistry());
@@ -58,7 +60,7 @@ registry.set(outputDefinition.type, outputDefinition);
 
 const STORAGE_KEY = "aether.graph.v2";
 const LEGACY_STORAGE_KEY = "aether.graph.v1";
-const DEFAULT_NODE_IDS = new Set(["scale", "roughness", "detail", "mist", "forest", "landscape"]);
+const DEFAULT_NODE_IDS = new Set(["scale", "roughness", "detail", "mist", "forest", "water", "landscape"]);
 
 function createDefaultGraph(): GraphDocument {
   return {
@@ -68,15 +70,17 @@ function createDefaultGraph(): GraphDocument {
       { id: "detail", type: "number.constant", params: { value: Number(detailInput.value) } },
       { id: "mist", type: "number.constant", params: { value: Number(mistInput.value) } },
       { id: "forest", type: "number.constant", params: { value: Number(forestInput.value) } },
+      { id: "water", type: "number.constant", params: { value: Number(waterInput.value) } },
       { id: "landscape", type: "landscape.compose" },
     ],
-    layout: { scale: { x: 40, y: 40 }, roughness: { x: 330, y: 40 }, detail: { x: 40, y: 320 }, mist: { x: 40, y: 600 }, forest: { x: 330, y: 600 }, landscape: { x: 330, y: 320 } },
+    layout: { scale: { x: 40, y: 40 }, roughness: { x: 330, y: 40 }, detail: { x: 40, y: 320 }, mist: { x: 40, y: 600 }, forest: { x: 330, y: 600 }, water: { x: 620, y: 600 }, landscape: { x: 330, y: 320 } },
     edges: [
       { id: "e-scale", fromNodeId: "scale", fromPort: "value", toNodeId: "landscape", toPort: "scale" },
       { id: "e-roughness", fromNodeId: "roughness", fromPort: "value", toNodeId: "landscape", toPort: "roughness" },
       { id: "e-detail", fromNodeId: "detail", fromPort: "value", toNodeId: "landscape", toPort: "octaves" },
       { id: "e-mist", fromNodeId: "mist", fromPort: "value", toNodeId: "landscape", toPort: "mist" },
       { id: "e-forest", fromNodeId: "forest", fromPort: "value", toNodeId: "landscape", toPort: "forest" },
+      { id: "e-water", fromNodeId: "water", fromPort: "value", toNodeId: "landscape", toPort: "water" },
     ],
   };
 }
@@ -131,11 +135,13 @@ function syncControlsFromGraph(): void {
   const detail = valueFor("detail");
   const mist = valueFor("mist");
   const forest = valueFor("forest");
+  const water = valueFor("water");
   if (scale !== null) scaleInput.value = String(scale);
   if (roughness !== null) roughnessInput.value = String(roughness);
   if (detail !== null) detailInput.value = String(detail);
   if (mist !== null) mistInput.value = String(mist);
   if (forest !== null) forestInput.value = String(forest);
+  if (water !== null) waterInput.value = String(water);
 }
 
 syncControlsFromGraph();
@@ -151,7 +157,7 @@ function evaluateLandscapeGraph() {
     }
     return value;
   };
-  return { scale: number("scale"), roughness: number("roughness"), octaves: number("octaves"), mist: number("mist"), forest: number("forest") };
+  return { scale: number("scale"), roughness: number("roughness"), octaves: number("octaves"), mist: number("mist"), forest: number("forest"), water: number("water") };
 }
 
 function readOptions() {
@@ -294,6 +300,7 @@ function updateOutputs(): void {
   requiredElement<HTMLOutputElement>("#detail-value").textContent = String(options.octaves);
   requiredElement<HTMLOutputElement>("#mist-value").textContent = Math.round(options.mist * 100) + "%";
   requiredElement<HTMLOutputElement>("#forest-value").textContent = Math.round(options.forest * 100) + "%";
+  requiredElement<HTMLOutputElement>("#water-value").textContent = Math.round(options.water * 100) + "%";
 }
 
 function render(): void {
@@ -359,10 +366,10 @@ function updateBaseNode(id: string, value: number): void {
 }
 
 function applyLandscapePreset(name: string): void {
-  const presets: Record<string, { scale: number; roughness: number; detail: number; mist: number; forest: number }> = {
-    soft: { scale: 0.8, roughness: 0.3, detail: 3, mist: 0.72, forest: 0.25 },
-    rugged: { scale: 1.5, roughness: 0.8, detail: 5, mist: 0.12, forest: 0.58 },
-    detailed: { scale: 1.9, roughness: 0.55, detail: 6, mist: 0.32, forest: 0.82 },
+  const presets: Record<string, { scale: number; roughness: number; detail: number; mist: number; forest: number; water: number }> = {
+    soft: { scale: 0.8, roughness: 0.3, detail: 3, mist: 0.72, forest: 0.25, water: 0.68 },
+    rugged: { scale: 1.5, roughness: 0.8, detail: 5, mist: 0.12, forest: 0.58, water: 0.18 },
+    detailed: { scale: 1.9, roughness: 0.55, detail: 6, mist: 0.32, forest: 0.82, water: 0.42 },
   };
   const preset = presets[name];
   if (!preset) return;
@@ -371,8 +378,10 @@ function applyLandscapePreset(name: string): void {
   updateBaseNode("detail", preset.detail);
   updateBaseNode("mist", preset.mist);
   updateBaseNode("forest", preset.forest);
+  updateBaseNode("water", preset.water);
   syncControlsFromGraph();
   forestInput.value = String(preset.forest);
+  waterInput.value = String(preset.water);
   mistInput.value = String(preset.mist);
   document.querySelectorAll<HTMLButtonElement>("[data-preset]").forEach((button) => {
     const active = button.dataset.preset === name;
@@ -386,13 +395,14 @@ document.querySelectorAll<HTMLButtonElement>("[data-preset]").forEach((button) =
   button.addEventListener("click", () => applyLandscapePreset(button.dataset.preset ?? ""));
 });
 
-for (const input of [seedInput, scaleInput, roughnessInput, detailInput, mistInput, forestInput]) {
+for (const input of [seedInput, scaleInput, roughnessInput, detailInput, mistInput, forestInput, waterInput]) {
   input.addEventListener("input", () => {
     if (input === scaleInput) updateBaseNode("scale", Number(input.value));
     if (input === roughnessInput) updateBaseNode("roughness", Number(input.value));
     if (input === detailInput) updateBaseNode("detail", Number(input.value));
     if (input === mistInput) updateBaseNode("mist", Number(input.value));
     if (input === forestInput) updateBaseNode("forest", Number(input.value));
+    if (input === waterInput) updateBaseNode("water", Number(input.value));
     scheduleRender();
   });
   input.addEventListener("change", saveGraph);
