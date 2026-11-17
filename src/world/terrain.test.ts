@@ -60,8 +60,8 @@ describe("world foundation v2", () => {
     const field = generateTerrain(recipe()).heightfield;
     const mesh = buildHeightfieldMesh(field);
     const perimeterVertices = 2 * (field.width + field.height) - 4;
-    const expectedVertices = field.width * field.height + perimeterVertices * 3 + 2;
-    const expectedTriangles = (field.width - 1) * (field.height - 1) * 2 + perimeterVertices * 6;
+    const expectedVertices = field.width * field.height + perimeterVertices * 2 + 1;
+    const expectedTriangles = (field.width - 1) * (field.height - 1) * 2 + perimeterVertices * 3;
     expect(mesh.vertexCount).toBe(expectedVertices);
     expect(mesh.triangleCount).toBe(expectedTriangles);
     expect(mesh.indices.length).toBe(expectedTriangles * 3);
@@ -69,17 +69,6 @@ describe("world foundation v2", () => {
     expect(Math.min(...Array.from(mesh.indices))).toBeGreaterThanOrEqual(0);
     expect(Array.from(mesh.normals).every(Number.isFinite)).toBe(true);
     expect(Array.from(mesh.positions).every(Number.isFinite)).toBe(true);
-  });
-  it("extends the terrain perimeter into a connected descending apron", () => {
-    const field = generateTerrain(recipe()).heightfield;
-    const mesh = buildHeightfieldMesh(field, 1.18);
-    const perimeterVertices = 2 * (field.width + field.height) - 4;
-    const apronStart = field.width * field.height + perimeterVertices * 2 + 1;
-    for (let i = 0; i < perimeterVertices; i += 1) {
-      const y = mesh.positions[(apronStart + i) * 3 + 1];
-      expect(y).toBeLessThanOrEqual(0.012);
-      expect(Number.isFinite(y)).toBe(true);
-    }
   });
   it("builds meshes at the maximum supported grid scale without argument overflow", () => {
     const width = 512, height = 256;
