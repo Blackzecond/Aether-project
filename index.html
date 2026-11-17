@@ -103,6 +103,7 @@
             <button id="import-graph" class="quiet-button" type="button">นำเข้า JSON ↑</button>
             <input id="graph-file" type="file" accept=".json,application/json" hidden />
           </div>
+          <p class="graph-toolbar-help">เพิ่มเครื่องมือคำนวณเพื่อแปลงค่าก่อนส่งไปควบคุมภาพ</p>
           <div class="graph-toolbar">
             <select id="node-type" aria-label="ประเภท Node ที่ต้องการเพิ่ม">
               <option value="number.constant">ค่าตัวเลข · กำหนดค่าเอง</option>
@@ -113,11 +114,11 @@
             <button id="add-node" class="quiet-button" type="button">+ เพิ่มเครื่องมือคำนวณ</button>
           </div>
           <div class="graph-organize-toolbar">
-            <input id="graph-search" type="search" placeholder="ค้นหา Node หรือชนิด..." aria-label="ค้นหา Node" />
+            <input id="graph-search" type="search" placeholder="ค้นหาเครื่องมือ..." aria-label="ค้นหาเครื่องมือ" />
             <select id="graph-category" aria-label="กรองตามหมวดหมู่">
-              <option value="all">ทุกหมวดหมู่</option>
+              <option value="all">ทุกประเภท</option>
               <option value="NUMBER">ตัวเลข</option>
-              <option value="MATH">คณิตศาสตร์</option>
+              <option value="MATH">เครื่องมือคำนวณ</option>
               <option value="OUTPUT">ผลลัพธ์</option>
             </select>
           </div>
