@@ -364,6 +364,7 @@ function applyLandscapePreset(name: string): void {
   updateBaseNode("detail", preset.detail);
   updateBaseNode("mist", preset.mist);
   syncControlsFromGraph();
+  mistInput.value = String(preset.mist);
   document.querySelectorAll<HTMLButtonElement>("[data-preset]").forEach((button) => {
     const active = button.dataset.preset === name;
     button.classList.toggle("is-active", active);
