@@ -1,6 +1,6 @@
 import type { GraphDocument, GraphEdge, GraphNode, GraphValue } from "./graph";
 
-export const GRAPH_DOCUMENT_VERSION = 1;
+export const GRAPH_DOCUMENT_VERSION = 2;
 const MAX_DOCUMENT_LENGTH = 1_000_000;
 const MAX_NODES = 10_000;
 const MAX_EDGES = 20_000;
@@ -56,8 +56,8 @@ function assertJsonValue(value: unknown, path: string, depth: number): asserts v
 
 function validateDocument(value: unknown): GraphDocument {
   if (!isRecord(value)) throw new GraphDocumentFormatError("Graph document must be an object.");
-  assertKeys(value, ["version", "nodes", "edges"], "Graph document");
-  if (value.version !== GRAPH_DOCUMENT_VERSION) {
+  assertKeys(value, ["version", "nodes", "edges", "layout"], "Graph document");
+  if (value.version !== 1 && value.version !== GRAPH_DOCUMENT_VERSION) {
     throw new GraphDocumentFormatError("Unsupported graph document version: " + String(value.version));
   }
   if (!Array.isArray(value.nodes) || !Array.isArray(value.edges)) {
@@ -107,7 +107,26 @@ function validateDocument(value: unknown): GraphDocument {
     };
   });
 
-  return { nodes, edges };
+  const layout: Record<string, { x: number; y: number }> = {};
+  if (value.layout !== undefined) {
+    if (!isRecord(value.layout)) throw new GraphDocumentFormatError("Graph layout must be an object.");
+    if (Object.keys(value.layout).length > MAX_NODES) throw new GraphDocumentFormatError("Graph layout contains too many positions.");
+    for (const [nodeId, rawPosition] of Object.entries(value.layout)) {
+      if (!nodeIds.has(nodeId)) throw new GraphDocumentFormatError("Graph layout references a missing node: " + nodeId);
+      if (!isRecord(rawPosition)) throw new GraphDocumentFormatError("Graph layout position must be an object.");
+      assertKeys(rawPosition, ["x", "y"], "Graph layout position");
+      const x = rawPosition.x, y = rawPosition.y;
+      if (typeof x !== "number" || !Number.isFinite(x) || x < 0 || x > 10000 ||
+          typeof y !== "number" || !Number.isFinite(y) || y < 0 || y > 10000) {
+        throw new GraphDocumentFormatError("Graph layout coordinates must be finite numbers between 0 and 10000.");
+      }
+      layout[nodeId] = { x, y };
+    }
+  }
+  nodes.forEach((node, index) => {
+    if (!layout[node.id]) layout[node.id] = { x: 60 + (index % 3) * 340, y: 60 + Math.floor(index / 3) * 250 };
+  });
+  return { nodes, edges, layout };
 }
 
 /** Parse and structurally validate a versioned graph document from untrusted text. */
@@ -130,12 +149,14 @@ export function serializeGraphDocument(graph: GraphDocument): string {
     version: GRAPH_DOCUMENT_VERSION,
     nodes: graph.nodes,
     edges: graph.edges,
+    layout: graph.layout ?? {},
   });
   try {
     const source = JSON.stringify({
       version: GRAPH_DOCUMENT_VERSION,
       nodes: normalized.nodes,
       edges: normalized.edges,
+      layout: normalized.layout,
     }, null, 2);
     if (source === undefined) throw new GraphDocumentFormatError("Graph document could not be serialized.");
     return source;
