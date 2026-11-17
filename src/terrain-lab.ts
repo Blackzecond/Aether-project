@@ -1,4 +1,5 @@
-import { DEFAULT_TERRAIN_RECIPE, createHeightfield, buildDrainageField, extractRiverNetwork, generateVegetation, type TerrainRecipe } from "./world";\nimport type { VolumeMesh } from "./world/volume/density-world";
+import { DEFAULT_TERRAIN_RECIPE, createHeightfield, buildDrainageField, extractRiverNetwork, generateVegetation, type TerrainRecipe } from "./world";
+import type { VolumeMesh } from "./world/volume/density-world";
 import { TerrainPreviewRenderer, type TerrainViewMode } from "./render/webgl2/terrain-preview";
 const canvas=document.querySelector<HTMLCanvasElement>("#terrain-canvas")!;
 const status=document.querySelector<HTMLElement>("#lab-status")!;
