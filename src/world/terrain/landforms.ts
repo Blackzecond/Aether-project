@@ -60,10 +60,11 @@ export function generateTerrain(recipe: TerrainRecipe): TerrainGeneration {
   let sum = 0;
   let sumSquares = 0;
 
-  // Keep the highest detail octave below the heightfield's practical
-  // sampling limit to avoid spending work on detail that aliases away.
-  const maxDetailFrequency = Math.max(1, 20 / Math.pow(1.9, landform.detailOctaves - 1));
-  const detailFrequency = Math.min(landform.detailScale, maxDetailFrequency);
+  // Keep high octaves within the grid's practical sampling limit without
+  // disabling the detail-scale control at larger octave counts.
+  const detailLacunarity = landform.detailOctaves > 1
+    ? Math.min(1.9, Math.pow(20 / landform.detailScale, 1 / (landform.detailOctaves - 1)))
+    : 1.9;
 
   for (let iz = 0; iz < height; iz += 1) {
     const z = bounds.minZ + (iz / (height - 1)) * (bounds.maxZ - bounds.minZ);
@@ -95,7 +96,7 @@ export function generateTerrain(recipe: TerrainRecipe): TerrainGeneration {
         seed + 4001,
         landform.detailOctaves,
         0.52,
-        1.9,
+        detailLacunarity,
       );
 
       const mountainBody = massif * (0.16 + ridges * 0.78);
