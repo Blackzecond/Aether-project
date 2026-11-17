@@ -64,7 +64,7 @@
             <span><span class="eyebrow">ระบบเบื้องหลัง</span><strong>Node Graph</strong></span>
             <span class="summary-meta"><span id="graph-count">4 NODES · 3 LINKS</span> <span class="chevron">⌄</span></span>
           </summary>
-          <p class="graph-description">แตะช่อง OUTPUT ของ Node ต้นทาง แล้วแตะ INPUT ของ Node ปลายทางเพื่อเชื่อมต่อ</p>
+          <p class="graph-description">ลากหัว Node เพื่อจัดตำแหน่ง · แตะ OUTPUT แล้วแตะ INPUT เพื่อเชื่อมสาย · ลากพื้นที่ว่างเพื่อเลื่อนมุมมอง</p>
           <div class="graph-file-toolbar">
             <button id="export-graph" class="quiet-button" type="button">ส่งออก JSON ↓</button>
             <button id="import-graph" class="quiet-button" type="button">นำเข้า JSON ↑</button>
@@ -79,10 +79,15 @@
             </select>
             <button id="add-node" class="quiet-button" type="button">+ เพิ่ม Node</button>
           </div>
+          <div class="graph-view-toolbar">
+            <button id="graph-zoom-out" class="quiet-button" type="button" aria-label="ซูมออก">−</button>
+            <button id="graph-zoom-reset" class="quiet-button" type="button">รีเซ็ตมุมมอง</button>
+            <button id="graph-zoom-in" class="quiet-button" type="button" aria-label="ซูมเข้า">+</button>
+          </div>
           <p id="graph-status" class="graph-status" role="status">พร้อมใช้งาน · บันทึก Graph ในเครื่องอัตโนมัติ</p>
-          <div id="node-list" class="node-list" aria-label="รายการ Node"></div>
+          <div id="graph-viewport" class="graph-viewport" aria-label="พื้นที่ Node Graph แบบอิสระ"></div>
           <button id="reset-graph" class="reset-graph-button" type="button">คืนค่า Graph เริ่มต้น</button>
-          <p class="graph-footnote">บันทึกในเครื่องอัตโนมัติ · ส่งออกหรือนำเข้า JSON เพื่อย้าย Graph · ใช้ปุ่มลูกศรจัดลำดับ Node</p>
+          <p class="graph-footnote">บันทึกในเครื่องอัตโนมัติ · ส่งออกหรือนำเข้า JSON เพื่อย้าย Graph · ลาก Node เพื่อจัดวาง · ซูมและเลื่อนพื้นที่ได้</p>
         </details>
       </section>
 
