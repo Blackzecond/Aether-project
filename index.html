@@ -1,158 +1,72 @@
 <!doctype html>
 <html lang="th">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#172321" />
-    <meta name="description" content="Aether — lightweight procedural studio." />
-    <title>Aether · Procedural Studio</title>
-  </head>
-  <body>
-    <main class="app-shell">
-      <header class="topbar">
-        <a class="brand" href="./" aria-label="Aether home">
-          <span class="brand-mark">a</span>
-          <span class="brand-name">aether <small>procedural studio</small></span>
-        </a>
-        <span class="version">ทดลองใช้ · 0.3</span>
-      </header>
-
-      <section class="intro">
-        <p class="eyebrow">สร้างสรรค์จากระบบและคณิตศาสตร์</p>
-        <h1>เริ่มจากสิ่งเล็ก ๆ</h1>
-        <p class="intro-copy">เริ่มจากรูปแบบที่ชอบ แล้วค่อย ๆ ปรับภูมิทัศน์ในแบบของคุณ</p>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#172321" />
+  <meta name="description" content="Aether — procedural world foundation." />
+  <title>Aether · World Foundation</title>
+  <link rel="stylesheet" href="/src/style.css" />
+  <style>
+    :root{color-scheme:dark}
+    body{margin:0;min-height:100vh;background:#101b19;color:#e8eee9}
+    .lab-shell{width:min(1180px,calc(100% - 28px));margin:auto;padding:16px 0 32px}
+    .lab-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0 16px;border-bottom:1px solid #34443d}
+    .lab-head .eyebrow{margin:0;color:#a7c1aa;font-size:10px;letter-spacing:.14em}
+    .lab-head h1{font-size:23px;margin:5px 0 0}
+    .lab-subtitle{margin:5px 0 0;color:#9daf9f;font-size:12px}
+    .lab-layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;margin-top:16px;align-items:start}
+    .lab-panel{min-width:0;border:1px solid #34443d;border-radius:14px;overflow:hidden;background:#202e2a}
+    .lab-canvas{height:min(68vh,680px);min-height:340px;background:#101b19}
+    .lab-canvas canvas{width:100%;height:100%;display:block;touch-action:pan-y}
+    .lab-controls{padding:14px}
+    .lab-controls h2{font-size:15px;margin:0 0 5px}
+    .lab-help{font-size:11px;color:#9daf9f;line-height:1.55;margin:0 0 12px}
+    .lab-controls label{display:flex;justify-content:space-between;gap:8px;margin:15px 0 5px;font-size:11px;color:#d2ddd4}
+    .lab-controls output{color:#b9d3bd;font-variant-numeric:tabular-nums}
+    .lab-controls input{width:100%;accent-color:#b5d0b9}
+    .lab-controls select{width:100%;height:40px;border:1px solid #34443d;border-radius:8px;background:#17231f;color:#e8eee9;padding:0 8px}
+    .lab-meta{display:flex;flex-wrap:wrap;gap:7px;padding:10px 12px;border-top:1px solid #34443d;color:#9daf9f;font-size:10px}
+    .lab-chip{padding:5px 7px;border:1px solid #34443d;border-radius:7px}
+    .lab-actions{display:flex;gap:8px;margin-top:15px}
+    .lab-actions button{flex:1;min-height:38px;border:1px solid #52665a;border-radius:8px;background:#293a33;color:#e8eee9}
+    .lab-note{padding:12px;color:#9daf9f;font-size:10px;line-height:1.6;margin:0}
+    .lab-status{font-size:11px;color:#b9d3bd}
+    .lab-heading{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px}
+    @media(max-width:760px){.lab-layout{grid-template-columns:1fr}.lab-canvas{height:48vh;min-height:280px}.lab-shell{width:calc(100% - 20px)}.lab-controls{display:grid;grid-template-columns:1fr 1fr;column-gap:14px}.lab-controls h2,.lab-help,.lab-controls label[for="debug-mode"],#debug-mode,.lab-actions{grid-column:1/-1}}
+  </style>
+</head>
+<body>
+  <main class="lab-shell">
+    <header class="lab-head">
+      <div><p class="eyebrow">AETHER · PROCEDURAL WORLD GENERATOR</p><h1>รากฐานภูมิประเทศ</h1><p class="lab-subtitle">สร้างและตรวจสอบพื้นผิวโลกจากข้อมูลความสูงชุดเดียวกัน</p></div>
+      <span class="lab-status" id="lab-status">กำลังสร้างโลก</span>
+    </header>
+    <div class="lab-layout">
+      <section class="lab-panel" aria-label="ตัวอย่างภูมิประเทศ">
+        <div class="lab-heading"><strong>พื้นผิวภูมิประเทศ · WebGL2</strong><span class="lab-status">WORLD SPACE</span></div>
+        <div class="lab-canvas"><canvas id="terrain-canvas" aria-label="พื้นผิวภูมิประเทศสามมิติ"></canvas></div>
+        <div class="lab-meta" id="lab-metrics"></div>
+        <p class="lab-note">นี่คือ Heightfield แบบสองมิติที่สร้างเป็น Mesh จริง มีความสูง ความลาดชัน Normal และ Depth Buffer ระบบแม่น้ำ ป่าไม้ และบรรยากาศจะยังไม่ถูกเพิ่มจนกว่ารูปทรงพื้นฐานจะผ่านการตรวจสอบ</p>
       </section>
-
-      <section class="workspace" aria-label="พื้นที่สร้างภูมิทัศน์">
-        <section class="preview-panel">
-          <div class="panel-heading">
-            <span><i class="status-dot"></i> ตัวอย่างผลงาน</span>
-            <span id="render-status" class="muted">กำลังเตรียม</span>
-          </div>
-          <div class="canvas-wrap">
-            <canvas id="preview" aria-label="ภูมิทัศน์ที่สร้างขึ้นด้วยระบบ Procedural"></canvas>
-          </div>
-          <div class="preview-footer">
-            <span id="seed-label">SEED 18273</span>
-            <span id="resolution-label">—</span>
-          </div>
-        </section>
-
-        <section class="controls-panel" aria-label="ตั้งค่าการสร้าง">
-          <div class="section-heading">
-            <div><span class="eyebrow">ปรับแต่งได้ทันที</span><h2>ออกแบบภูมิทัศน์</h2></div>
-            <button id="randomize" class="quiet-button" type="button"><span aria-hidden="true">↻</span> สุ่มภาพ</button>
-          </div>
-
-          <div class="preset-heading">
-            <strong>เริ่มจากรูปแบบที่ชอบ</strong>
-            <span>เลือกแบบหนึ่ง แล้วปรับต่อได้</span>
-          </div>
-          <div class="landscape-presets" role="group" aria-label="รูปแบบภูมิทัศน์เริ่มต้น">
-            <button class="landscape-preset" type="button" data-preset="soft" aria-pressed="false">
-              <span class="preset-art preset-art-soft" aria-hidden="true"></span>
-              <strong>ภูเขานุ่มนวล</strong>
-              <small>เนินลาด รายละเอียดน้อย</small>
-            </button>
-            <button class="landscape-preset" type="button" data-preset="rugged" aria-pressed="false">
-              <span class="preset-art preset-art-rugged" aria-hidden="true"></span>
-              <strong>สันเขาคมชัด</strong>
-              <small>พื้นผิวขรุขระมากขึ้น</small>
-            </button>
-            <button class="landscape-preset" type="button" data-preset="detailed" aria-pressed="false">
-              <span class="preset-art preset-art-detailed" aria-hidden="true"></span>
-              <strong>ภูเขาละเอียด</strong>
-              <small>เพิ่มชั้นรายละเอียด</small>
-            </button>
-          </div>
-
-          <div class="friendly-control">
-            <label class="field-label" for="scale">รูปทรงของภูเขา <output id="scale-value">1.2</output></label>
-            <p>ปรับจากเนินกว้าง ๆ ไปจนถึงแนวเขาที่ถี่และซับซ้อน</p>
-            <input id="scale" type="range" min="0.5" max="2.4" step="0.1" value="1.2" />
-          </div>
-          <div class="friendly-control">
-            <label class="field-label" for="roughness">ความขรุขระของสันเขา <output id="roughness-value">0.55</output></label>
-            <p>ค่าน้อยจะดูเรียบ ค่ามากจะมีสันและร่องชัดขึ้น</p>
-            <input id="roughness" type="range" min="0.15" max="0.85" step="0.05" value="0.55" />
-          </div>
-          <div class="friendly-control">
-            <label class="field-label" for="detail">จำนวนรายละเอียด <output id="detail-value">4</output></label>
-            <p>เพิ่มชั้นความซับซ้อนให้รูปทรงภูเขา</p>
-            <input id="detail" type="range" min="1" max="6" step="1" value="4" />
-          </div>
-          <div class="friendly-control">
-            <label class="field-label" for="mist">หมอกในหุบเขา <output id="mist-value">35%</output></label>
-            <p>เพิ่มหมอกบาง ๆ เพื่อสร้างระยะลึกและบรรยากาศให้ภูเขา</p>
-            <input id="mist" type="range" min="0" max="1" step="0.05" value="0.35" />
-          </div>
-          <div class="friendly-control">
-            <label class="field-label" for="forest-density">ความหนาแน่นของป่า <output id="forest-value">45%</output></label>
-            <p>เพิ่มแนวต้นไม้หลายระยะ ตั้งแต่ป่าโปร่งจนถึงป่าทึบ</p>
-            <input id="forest-density" type="range" min="0" max="1" step="0.05" value="0.45" />
-          </div>
-          <div class="friendly-control">
-            <label class="field-label" for="water">แม่น้ำในหุบเขา <output id="water-value">35%</output></label>
-            <p>เพิ่มลำน้ำคดเคี้ยวให้ภูมิทัศน์ มีตั้งแต่ลำธารเล็กไปจนถึงแม่น้ำกว้าง</p>
-            <input id="water" type="range" min="0" max="1" step="0.05" value="0.35" />
-          </div>
-
-          <details class="advanced-seed">
-            <summary>ตั้งค่ารูปแบบสุ่มเพิ่มเติม</summary>
-            <label class="field-label" for="seed">รหัสรูปแบบ</label>
-            <input id="seed" class="seed-input" type="number" value="18273" inputmode="numeric" />
-            <p>ใช้รหัสเดิมเพื่อสร้างรูปแบบเดิมอีกครั้ง</p>
-          </details>
-
-          <button id="regenerate" class="primary-button" type="button">อัปเดตภาพตัวอย่าง <span aria-hidden="true">↗</span></button>
-        </section>
-
-        <details class="graph-panel" id="graph-panel">
-          <summary>
-            <span><span class="eyebrow">สำหรับผู้ที่อยากควบคุมละเอียด</span><strong>เครื่องมือสร้างแบบ Node</strong></span>
-            <span class="summary-meta"><span id="graph-count">4 NODES · 3 LINKS</span> <span class="chevron">⌄</span></span>
-          </summary>
-          <p class="graph-description">ส่วนนี้เป็นเครื่องมือขั้นสูง สำหรับนำค่ามาคำนวณและเชื่อมต่อกันเพื่อควบคุมผลงาน ผู้เริ่มต้นสามารถใช้งานแผงปรับแต่งด้านบนได้โดยไม่ต้องเปิดส่วนนี้</p>
-          <div class="graph-file-toolbar">
-            <button id="export-graph" class="quiet-button" type="button">ส่งออก JSON ↓</button>
-            <button id="import-graph" class="quiet-button" type="button">นำเข้า JSON ↑</button>
-            <input id="graph-file" type="file" accept=".json,application/json" hidden />
-          </div>
-          <p class="graph-toolbar-help">เพิ่มเครื่องมือคำนวณเพื่อแปลงค่าก่อนส่งไปควบคุมภาพ</p>
-          <div class="graph-toolbar">
-            <select id="node-type" aria-label="ประเภท Node ที่ต้องการเพิ่ม">
-              <option value="number.constant">ค่าตัวเลข · กำหนดค่าเอง</option>
-              <option value="math.add">คำนวณ · บวกตัวเลข</option>
-              <option value="math.multiply">คำนวณ · คูณตัวเลข</option>
-              <option value="math.clamp">คำนวณ · จำกัดช่วงค่า</option>
-            </select>
-            <button id="add-node" class="quiet-button" type="button">+ เพิ่มเครื่องมือคำนวณ</button>
-          </div>
-          <div class="graph-organize-toolbar">
-            <input id="graph-search" type="search" placeholder="ค้นหาเครื่องมือ..." aria-label="ค้นหาเครื่องมือ" />
-            <select id="graph-category" aria-label="กรองตามหมวดหมู่">
-              <option value="all">ทุกประเภท</option>
-              <option value="NUMBER">ตัวเลข</option>
-              <option value="MATH">เครื่องมือคำนวณ</option>
-              <option value="OUTPUT">ผลลัพธ์</option>
-            </select>
-          </div>
-          <p id="graph-filter-count" class="graph-filter-count">แสดง Node ทั้งหมด</p>
-          <div class="graph-view-toolbar">
-            <button id="graph-zoom-out" class="quiet-button" type="button" aria-label="ซูมออก">−</button>
-            <button id="graph-fit" class="quiet-button" type="button">จัดให้เห็นทั้งหมด</button>
-            <button id="graph-zoom-reset" class="quiet-button" type="button">รีเซ็ต</button>
-            <button id="graph-zoom-in" class="quiet-button" type="button" aria-label="ซูมเข้า">+</button>
-          </div>
-          <p id="graph-status" class="graph-status" role="status">พร้อมใช้งาน · บันทึก Graph ในเครื่องอัตโนมัติ</p>
-          <div id="graph-viewport" class="graph-viewport" aria-label="พื้นที่ Node Graph แบบอิสระ"></div>
-          <button id="reset-graph" class="reset-graph-button" type="button">คืนค่า Graph เริ่มต้น</button>
-          <p class="graph-footnote">การเปลี่ยนแปลงจะบันทึกในเครื่องอัตโนมัติ · ลากการ์ดเพื่อจัดวาง · เชื่อมช่องส่งกับช่องรับเพื่อส่งค่าระหว่างเครื่องมือ</p>
-        </details>
-      </section>
-
-      <footer class="bottom-note"><span>PROCEDURAL FIRST · MOBILE FRIENDLY</span><span>สร้างจากโค้ด ไม่ใช้ภาพสำเร็จรูป</span></footer>
-    </main>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
+      <aside class="lab-panel lab-controls">
+        <h2>ปรับแต่งภูเขา</h2>
+        <p class="lab-help">เปลี่ยนค่าแล้วดูผลบนพื้นผิวจริงทันที แต่ละค่าควบคุมคุณสมบัติคนละด้าน</p>
+        <label for="spacing">ระยะห่างแนวภูเขา <output id="spacing-value"></output></label><input id="spacing" type="range" min=".2" max="2.5" step=".01" value=".72">
+        <label for="relief">ความสูงโดยรวม <output id="relief-value"></output></label><input id="relief" type="range" min=".05" max="1.5" step=".01" value=".72">
+        <label for="sharpness">ยอดมน ↔ ยอดแหลม <output id="sharpness-value"></output></label><input id="sharpness" type="range" min="0" max="1" step=".01" value=".58">
+        <label for="irregularity">ความคดเคี้ยวของสันเขา <output id="irregularity-value"></output></label><input id="irregularity" type="range" min="0" max="1" step=".01" value=".32">
+        <label for="roughness">ความขรุขระ <output id="roughness-value"></output></label><input id="roughness" type="range" min="0" max=".6" step=".01" value=".16">
+        <label for="detail-scale">ขนาดรายละเอียด <output id="detail-scale-value"></output></label><input id="detail-scale" type="range" min="1" max="16" step=".1" value="5.5">
+        <label for="octaves">จำนวนชั้นรายละเอียด <output id="octaves-value"></output></label><input id="octaves" type="range" min="1" max="7" step="1" value="4">
+        <label for="debug-mode">มุมมองตรวจสอบ</label><select id="debug-mode">
+          <option value="shaded">พื้นผิวและแสง</option><option value="elevation">ระดับความสูง</option><option value="slope">ความลาดชัน</option><option value="normals">ทิศทางพื้นผิว</option><option value="wireframe">โครงตาข่าย</option>
+        </select>
+        <div class="lab-actions"><button id="new-seed" type="button">สุ่ม Seed</button><button id="reset-terrain" type="button">คืนค่า</button></div>
+        <label for="seed">Seed <output id="seed-value"></output></label><input id="seed" type="range" min="1" max="99999" step="1" value="18273">
+      </aside>
+    </div>
+  </main>
+  <script type="module" src="/src/terrain-lab.ts"></script>
+</body>
 </html>
