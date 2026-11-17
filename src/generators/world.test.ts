@@ -19,6 +19,31 @@ describe("shared landscape world", () => {
     expect(first.river).toEqual(second.river);
   });
 
+  it("keeps river endpoints anchored when terrain parameters change", () => {
+    const calm = createLandscapeWorld(640, 360, baseOptions);
+    const rugged = createLandscapeWorld(640, 360, { ...baseOptions, roughness: 0.95, scale: 1.8 });
+    expect(calm.river[0].x).toBe(rugged.river[0].x);
+    expect(calm.river.at(-1)?.x).toBe(rugged.river.at(-1)?.x);
+    expect(calm.river[0].y).toBe(rugged.river[0].y);
+  });
+
+  it("keeps the river path continuous without abrupt lateral jumps", () => {
+    const world = createLandscapeWorld(640, 360, baseOptions);
+    const largestStep = Math.max(...world.river.slice(1).map((point, index) =>
+      Math.abs(point.x - world.river[index].x)));
+    expect(largestStep).toBeLessThan(640 * 0.075);
+    expect(world.river.every((point, index) => index === 0 || point.y > world.river[index - 1].y)).toBe(true);
+  });
+
+  it("scales the complete river width uniformly with the water control", () => {
+    const narrow = createLandscapeWorld(640, 360, { ...baseOptions, water: 0.35 });
+    const wide = createLandscapeWorld(640, 360, { ...baseOptions, water: 0.7 });
+    expect(narrow.river).toHaveLength(wide.river.length);
+    for (let index = 0; index < narrow.river.length; index += 1) {
+      expect(narrow.river[index].width).toBeCloseTo(wide.river[index].width * 0.5, 5);
+    }
+  });
+
   it("widens the river toward the foreground using perspective", () => {
     const world = createLandscapeWorld(640, 360, baseOptions);
     expect(world.river.length).toBeGreaterThan(20);
@@ -33,10 +58,10 @@ describe("shared landscape world", () => {
     expect(world.river).toHaveLength(0);
   });
 
-  it("changes the shared terrain profile when mountain parameters change", () => {
+  it("changes terrain and the route interior when mountain parameters change", () => {
     const calm = createLandscapeWorld(640, 360, baseOptions);
     const rugged = createLandscapeWorld(640, 360, { ...baseOptions, roughness: 0.95, scale: 1.8 });
     expect(Array.from(calm.layers[2].surface)).not.toEqual(Array.from(rugged.layers[2].surface));
-    expect(calm.river).not.toEqual(rugged.river);
+    expect(calm.river.slice(1, -1)).not.toEqual(rugged.river.slice(1, -1));
   });
 });
