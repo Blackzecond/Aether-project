@@ -107,7 +107,7 @@ export function buildHeightfieldMesh(field: Heightfield, verticalScale = 1): Ter
     const topB = perimeter[next];
     const apronA = groundStart + i;
     const apronB = groundStart + next;
-    indices.push(topA, apronA, topB, topB, apronA, apronB);
+    indices.push(topA, topB, apronA, topB, apronB, apronA);
   });
   put(
     groundCenter,
@@ -118,7 +118,7 @@ export function buildHeightfieldMesh(field: Heightfield, verticalScale = 1): Ter
   );
   perimeter.forEach((_, i) => {
     const next = (i + 1) % perimeter.length;
-    indices.push(groundCenter, groundStart + i, groundStart + next);
+    indices.push(groundCenter, groundStart + next, groundStart + i);
   });
 
   const indexArray = new Uint32Array(indices);
