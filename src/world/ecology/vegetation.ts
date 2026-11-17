@@ -75,7 +75,7 @@ export function generateVegetation(
       const density = nearWater ? 0.94 : 0.78;
       if (hash(seed + 71, gx, gz) > density) continue;
       instances.push({
-        x, y: surface.elevation * 1.18 + 0.0015, z,
+        x, y: surface.elevation + 0.00035, z,
         height: 0.009 + hash(seed + 83, gx, gz) * 0.010,
         tint: hash(seed + 97, gx, gz),
       });
@@ -115,7 +115,7 @@ export function generateVegetation(
             ? 0.0014 + hash(seed + 181, gx, gz) * 0.0014
             : 0.00035 + hash(seed + 181, gx, gz) * 0.0005;
       groundCover.push({
-        x, y: surface.elevation * 1.18 + 0.0012, z, scale,
+        x, y: surface.elevation + 0.0002, z, scale,
         tint: hash(seed + 193, gx, gz), kind,
       });
       if (groundCover.length >= 7200) break;
