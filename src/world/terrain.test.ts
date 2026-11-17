@@ -23,7 +23,7 @@ describe("world foundation v2", () => {
     const rough = generateTerrain(recipe({ roughness: 0.24 }));
     const sharp = generateTerrain(recipe({ peakSharpness: 0.68 }));
     const spaced = generateTerrain(recipe({ mountainSpacing: 1.45 }));
-    const irregular = generateTerrain(recipe({ ridgeIrregularity: 0.9 }));
+    const irregular = generateTerrain(recipe({ ridgeIrregularity: 0.7 }));
     const fineDetail = generateTerrain(recipe({ detailScale: 4.8 }));
     const moreOctaves = generateTerrain(recipe({ detailOctaves: 4 }));
     expect(relief.diagnostics.mean).not.toBeCloseTo(base.diagnostics.mean, 3);
