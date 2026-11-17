@@ -110,6 +110,12 @@ void main() {
     base = mix(base * (0.88 + broadTexture * 0.24), earthTint, (1.0 - rockExposure) * 0.12);
     base = mix(base, rockTint, rockExposure * 0.58);
     base *= 0.94 + stoneGrain * 0.12 + fineGrain * 0.035;
+    float bumpStep = 0.003;
+    vec2 bumpGradient = vec2(
+      fbm2((texCoord + vec2(bumpStep, 0.0)) * 74.0) - stoneGrain,
+      fbm2((texCoord + vec2(0.0, bumpStep)) * 74.0) - stoneGrain
+    ) / bumpStep;
+    n = normalize(n - vec3(bumpGradient.x, 0.0, bumpGradient.y) * 0.0009 * rockExposure);
     vec3 lightDirection = normalize(vec3(-0.55, 0.82, 0.42));
     vec3 viewDirection = normalize(uCameraPosition - vPosition);
     vec3 halfDirection = normalize(lightDirection + viewDirection);
