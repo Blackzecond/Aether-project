@@ -3,6 +3,8 @@ import { DEFAULT_TERRAIN_RECIPE, validateTerrainRecipe } from "./recipe";
 import { generateTerrain, deriveSubsystemSeed } from "./terrain/landforms";
 import { sampleElevation, sampleSurface, sampleCurvature } from "./fields/heightfield";
 import { buildHeightfieldMesh } from "./mesh/heightfield-mesh";
+import { createHeightfield } from "./fields/heightfield";
+import { buildDrainageField } from "./hydrology/drainage";
 function recipe(overrides: Partial<typeof DEFAULT_TERRAIN_RECIPE["landform"]> = {}) {
   return { ...DEFAULT_TERRAIN_RECIPE, landform: { ...DEFAULT_TERRAIN_RECIPE.landform, ...overrides } };
 }
@@ -69,6 +71,41 @@ describe("world foundation v2", () => {
   });
   it("rejects unsafe recipes", () => {
     expect(() => validateTerrainRecipe({ ...recipe(), width: 900 })).toThrow();
+  });
+
+  it("builds deterministic, acyclic multi-outlet drainage without changing terrain", () => {
+    const width = 9, height = 9;
+    const values = new Float32Array(width * height).fill(0.5);
+    for (let z = 0; z < height; z += 1) {
+      for (let x = 0; x < width; x += 1) {
+        if (x === 0 || z === 0 || x === width - 1 || z === height - 1) values[z * width + x] = 0.01;
+      }
+    }
+    values[4 * width + 4] = 0.1;
+    const field = createHeightfield(width, height, values);
+    const before = Array.from(field.values);
+    const drainage = buildDrainageField(field);
+    const repeated = buildDrainageField(field);
+    expect(Array.from(drainage.filledElevation)).toEqual(Array.from(repeated.filledElevation));
+    expect(Array.from(drainage.flowTo)).toEqual(Array.from(repeated.flowTo));
+    expect(Array.from(drainage.accumulation)).toEqual(Array.from(repeated.accumulation));
+    expect(drainage.diagnostics.outletCount).toBe(32);
+    expect(drainage.diagnostics.filledCellCount).toBeGreaterThan(0);
+    expect(drainage.filledElevation[4 * width + 4]).toBeGreaterThan(values[4 * width + 4]);
+    expect(Array.from(field.values)).toEqual(before);
+
+    let outletAccumulation = 0;
+    for (const outlet of drainage.outletIndices) outletAccumulation += drainage.accumulation[outlet];
+    expect(outletAccumulation).toBeCloseTo(width * height, 4);
+    for (let index = 0; index < width * height; index += 1) {
+      const downstream = drainage.flowTo[index];
+      expect(drainage.basinId[index]).toBeGreaterThanOrEqual(0);
+      if (downstream >= 0) {
+        expect(Math.abs((index % width) - (downstream % width))).toBeLessThanOrEqual(1);
+        expect(Math.abs(Math.floor(index / width) - Math.floor(downstream / width))).toBeLessThanOrEqual(1);
+        expect(drainage.filledElevation[downstream]).toBeLessThanOrEqual(drainage.filledElevation[index]);
+      }
+    }
   });
   it("isolates subsystem seeds", () => {
     expect(deriveSubsystemSeed(42, "forest")).toBe(deriveSubsystemSeed(42, "forest"));
