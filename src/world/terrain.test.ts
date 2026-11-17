@@ -70,6 +70,15 @@ describe("world foundation v2", () => {
     expect(Array.from(mesh.normals).every(Number.isFinite)).toBe(true);
     expect(Array.from(mesh.positions).every(Number.isFinite)).toBe(true);
   });
+  it("builds meshes at the maximum supported grid scale without argument overflow", () => {
+    const width = 512, height = 256;
+    const field = createHeightfield(width, height, new Float32Array(width * height).fill(0.1));
+    const mesh = buildHeightfieldMesh(field);
+    expect(mesh.vertexCount).toBeGreaterThan(width * height);
+    expect(mesh.triangleCount).toBeGreaterThan((width - 1) * (height - 1) * 2);
+    expect(Number.isFinite(mesh.positions[0])).toBe(true);
+  });
+
   it("rejects unsafe recipes", () => {
     expect(() => validateTerrainRecipe({ ...recipe(), width: 900 })).toThrow();
   });
