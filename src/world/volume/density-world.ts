@@ -11,10 +11,11 @@ export interface DensityVolume {
   readonly values:Float32Array;
 }
 export interface VolumeMeshChunk {readonly startIndex:number;readonly indexCount:number;readonly centerX:number;readonly centerZ:number}
-export interface VolumeMesh {
+export interface VolumeMeshLod {
   readonly positions:Float32Array;readonly normals:Float32Array;readonly indices:Uint32Array;
   readonly vertexCount:number;readonly triangleCount:number;readonly chunks:readonly VolumeMeshChunk[];
 }
+export interface VolumeMesh extends VolumeMeshLod {readonly lods:readonly VolumeMeshLod[]}
 export interface DensityWorld {
   readonly heightfield:Heightfield;readonly volume:DensityVolume;readonly mesh:VolumeMesh;
   readonly diagnostics:{readonly samples:number;readonly vertices:number;readonly triangles:number;readonly occupiedSamples:number};
@@ -126,21 +127,54 @@ export function generateDensityWorld(recipe:TerrainRecipe,resolution:DensityReso
       }
     }
   }
-  const volume:DensityVolume={width,height,depth,origin,voxelSize,values},mesh=buildSurfaceNets(volume);
+  const volume:DensityVolume={width,height,depth,origin,voxelSize,values};
+  return assembleDensityWorld(volume,occupiedSamples);
+}
+
+/** Builds the shared heightfield and three geometric LODs from one authoritative density volume. */
+export function assembleDensityWorld(volume:DensityVolume,occupiedSamples?:number):DensityWorld{
+  const {width,height,depth,origin,voxelSize,values}=volume;
   const heightValues=new Float32Array(width*depth);
+  let occupied=0;
+  for(let i=0;i<values.length;i++)if(values[i]>0)occupied++;
   for(let z=0;z<depth;z++)for(let x=0;x<width;x++){
     let top=0;
     for(let y=height-2;y>=0;y--){
-      const upper=values[index(x,y+1,z)],lower=values[index(x,y,z)];
+      const upper=values[x+width*((y+1)+height*z)],lower=values[x+width*(y+height*z)];
       if(upper<=0&&lower>0){const t=lower/(lower-upper);top=origin.y+(y+t)*voxelSize.y;break;}
     }
     heightValues[z*width+x]=top;
   }
+  const bounds={minX:origin.x,maxX:origin.x+(width-1)*voxelSize.x,minZ:origin.z,maxZ:origin.z+(depth-1)*voxelSize.z};
   const heightfield=createHeightfield(width,depth,heightValues,bounds);
-  return{heightfield,volume,mesh,diagnostics:{samples:values.length,vertices:mesh.vertexCount,triangles:mesh.triangleCount,occupiedSamples}};
+  const high=buildSurfaceNets(volume),medium=buildSurfaceNets(downsampleVolume(volume,2)),low=buildSurfaceNets(downsampleVolume(volume,4));
+  const mesh:VolumeMesh={...high,lods:[high,medium,low]};
+  return{heightfield,volume,mesh,diagnostics:{samples:values.length,vertices:high.vertexCount,triangles:high.triangleCount,occupiedSamples:occupiedSamples??occupied}};
 }
 
-export function buildSurfaceNets(volume:DensityVolume):VolumeMesh{
+function downsampleVolume(source:DensityVolume,factor:number):DensityVolume{
+  const width=Math.max(2,Math.floor((source.width-1)/factor)+1);
+  const height=Math.max(2,Math.floor((source.height-1)/factor)+1);
+  const depth=Math.max(2,Math.floor((source.depth-1)/factor)+1);
+  const values=new Float32Array(width*height*depth);
+  const at=(x:number,y:number,z:number)=>source.values[x+source.width*(y+source.height*z)];
+  for(let z=0;z<depth;z++)for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+    const sx=x/(width-1)*(source.width-1),sy=y/(height-1)*(source.height-1),sz=z/(depth-1)*(source.depth-1);
+    const x0=Math.floor(sx),y0=Math.floor(sy),z0=Math.floor(sz);
+    const x1=Math.min(source.width-1,x0+1),y1=Math.min(source.height-1,y0+1),z1=Math.min(source.depth-1,z0+1);
+    const tx=sx-x0,ty=sy-y0,tz=sz-z0;
+    const a=mix(mix(at(x0,y0,z0),at(x1,y0,z0),tx),mix(at(x0,y1,z0),at(x1,y1,z0),tx),ty);
+    const b=mix(mix(at(x0,y0,z1),at(x1,y0,z1),tx),mix(at(x0,y1,z1),at(x1,y1,z1),tx),ty);
+    values[x+width*(y+height*z)]=mix(a,b,tz);
+  }
+  return{width,height,depth,origin:source.origin,voxelSize:{
+    x:(source.width-1)*source.voxelSize.x/(width-1),
+    y:(source.height-1)*source.voxelSize.y/(height-1),
+    z:(source.depth-1)*source.voxelSize.z/(depth-1),
+  },values};
+}
+
+export function buildSurfaceNets(volume:DensityVolume):VolumeMeshLod{
   const{width:nx,height:ny,depth:nz,values:D,origin,voxelSize}=volume,slice=nx*ny;
   const positions:number[]=[],indices:number[]=[];
   let current=new Int32Array(slice),previous=new Int32Array(slice);
