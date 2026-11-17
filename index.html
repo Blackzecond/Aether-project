@@ -1,70 +1,104 @@
 <!doctype html>
-<html lang="en">
+<html lang="th">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#10191d" />
-    <meta name="description" content="A lightweight procedural creation playground." />
-    <title>Aether Project</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#172321" />
+    <meta name="description" content="Aether — lightweight procedural studio." />
+    <title>Aether · Procedural Studio</title>
   </head>
   <body>
     <main class="app-shell">
       <header class="topbar">
         <a class="brand" href="./" aria-label="Aether home">
-          <span class="brand-mark">A</span>
-          <span>AETHER <small>PROCEDURAL STUDIO</small></span>
+          <span class="brand-mark">a</span>
+          <span class="brand-name">aether <small>procedural studio</small></span>
         </a>
-        <span class="version">EARLY PLAYGROUND · 0.1</span>
+        <span class="version">ทดลองใช้ · 0.2</span>
       </header>
 
       <section class="intro">
-        <p class="eyebrow">GENERATIVE SYSTEMS / EXPERIMENT 001</p>
-        <h1>Make more from <em>less.</em></h1>
-        <p class="intro-copy">A small first step: a landscape generated from math, a seed and a handful of parameters. No image assets required.</p>
+        <p class="eyebrow">สร้างสรรค์จากระบบและคณิตศาสตร์</p>
+        <h1>เริ่มจากสิ่งเล็ก ๆ</h1>
+        <p class="intro-copy">สร้างภูมิทัศน์ด้วยพารามิเตอร์และ Node Graph ที่ทำงานร่วมกัน</p>
       </section>
 
-      <section class="workspace" aria-label="Procedural landscape workspace">
-        <div class="preview-panel">
+      <section class="workspace" aria-label="พื้นที่สร้างภูมิทัศน์">
+        <section class="preview-panel">
           <div class="panel-heading">
-            <div><span class="status-dot"></span> LIVE GENERATION <span class="muted">/ 2D FIELD</span></div>
-            <span id="render-status" class="muted">READY</span>
+            <span><i class="status-dot"></i> ตัวอย่างผลงาน</span>
+            <span id="render-status" class="muted">กำลังเตรียม</span>
           </div>
           <div class="canvas-wrap">
-            <canvas id="preview" aria-label="Procedurally generated layered landscape"></canvas>
+            <canvas id="preview" aria-label="ภูมิทัศน์ที่สร้างขึ้นด้วยระบบ Procedural"></canvas>
           </div>
           <div class="preview-footer">
             <span id="seed-label">SEED 18273</span>
             <span id="resolution-label">—</span>
           </div>
-        </div>
+        </section>
 
-        <aside class="controls-panel">
-          <div class="panel-heading">GENERATOR <span class="muted">/ 01</span></div>
-          <label class="field-label" for="seed">Random seed</label>
-          <div class="seed-row">
-            <input id="seed" type="number" value="18273" inputmode="numeric" />
-            <button id="randomize" class="icon-button" type="button" aria-label="Randomize seed" title="Randomize seed">↻</button>
+        <section class="controls-panel" aria-label="ตั้งค่าการสร้าง">
+          <div class="section-heading">
+            <div><span class="eyebrow">ปรับแต่ง</span><h2>ภูมิทัศน์</h2></div>
+            <button id="randomize" class="quiet-button" type="button"><span aria-hidden="true">↻</span> สุ่มใหม่</button>
           </div>
 
-          <label class="field-label" for="scale">Terrain scale <output id="scale-value">1.2</output></label>
+          <label class="field-label" for="seed">Seed</label>
+          <input id="seed" class="seed-input" type="number" value="18273" inputmode="numeric" />
+
+          <label class="field-label" for="scale">ขนาดภูมิประเทศ <output id="scale-value">1.2</output></label>
           <input id="scale" type="range" min="0.5" max="2.4" step="0.1" value="1.2" />
 
-          <label class="field-label" for="roughness">Roughness <output id="roughness-value">0.55</output></label>
+          <label class="field-label" for="roughness">ความขรุขระ <output id="roughness-value">0.55</output></label>
           <input id="roughness" type="range" min="0.15" max="0.85" step="0.05" value="0.55" />
 
-          <label class="field-label" for="detail">Detail layers <output id="detail-value">4</output></label>
+          <label class="field-label" for="detail">รายละเอียด <output id="detail-value">4</output></label>
           <input id="detail" type="range" min="1" max="6" step="1" value="4" />
 
-          <div class="control-divider"></div>
-          <button id="regenerate" class="primary-button" type="button">Regenerate landscape <span>↗</span></button>
-          <p class="hint">Generation runs only when a parameter changes. The preview does not run a continuous animation loop, helping conserve battery and avoid unnecessary GPU work.</p>
-        </aside>
+          <button id="regenerate" class="primary-button" type="button">สร้างภูมิทัศน์ใหม่ <span aria-hidden="true">↗</span></button>
+        </section>
+
+        <details class="graph-panel" id="graph-panel">
+          <summary>
+            <span><span class="eyebrow">ระบบเบื้องหลัง</span><strong>Node Graph</strong></span>
+            <span class="summary-meta">3 INPUTS · 1 OUTPUT <span class="chevron">⌄</span></span>
+          </summary>
+          <p class="graph-description">ค่าจากตัวปรับด้านบนจะไหลผ่าน Node และถูกรวมเป็นค่าที่ Generator ใช้งานจริง</p>
+          <div class="node-flow" aria-label="ลำดับการทำงานของ Node Graph">
+            <div class="node-card">
+              <span class="node-type">NUMBER · 01</span>
+              <strong>Terrain Scale</strong>
+              <span class="node-value" id="node-scale">1.2</span>
+              <span class="node-port">● value</span>
+            </div>
+            <div class="flow-line"><span>↓</span></div>
+            <div class="node-card">
+              <span class="node-type">NUMBER · 02</span>
+              <strong>Roughness</strong>
+              <span class="node-value" id="node-roughness">0.55</span>
+              <span class="node-port">● value</span>
+            </div>
+            <div class="flow-line"><span>↓</span></div>
+            <div class="node-card">
+              <span class="node-type">NUMBER · 03</span>
+              <strong>Detail Layers</strong>
+              <span class="node-value" id="node-detail">4</span>
+              <span class="node-port">● value</span>
+            </div>
+            <div class="flow-line"><span>↓</span></div>
+            <div class="node-card output-node">
+              <span class="node-type">LANDSCAPE · OUTPUT</span>
+              <strong>Landscape Generator</strong>
+              <span class="node-value">พร้อมประมวลผล</span>
+              <span class="node-port">● settings</span>
+            </div>
+          </div>
+          <p class="graph-footnote">รุ่นนี้เป็น Graph แบบกำหนดโครงสร้างไว้ก่อน ยังไม่รองรับการลาก Node หรือสร้างสายเชื่อมต่อด้วยมือ</p>
+        </details>
       </section>
 
-      <footer class="bottom-note">
-        <span>PROCEDURAL-FIRST · DETERMINISTIC · MOBILE-AWARE</span>
-        <span>Built from code, not image files.</span>
-      </footer>
+      <footer class="bottom-note"><span>PROCEDURAL FIRST · MOBILE FRIENDLY</span><span>สร้างจากโค้ด ไม่ใช้ภาพสำเร็จรูป</span></footer>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>
