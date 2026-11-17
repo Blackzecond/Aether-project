@@ -47,7 +47,7 @@
         <div class="lab-heading"><strong>พื้นผิวภูมิประเทศ · WebGL2</strong><button id="reset-camera" type="button">รีเซ็ตมุมกล้อง</button></div>
         <div class="lab-canvas"><canvas id="terrain-canvas" aria-label="พื้นผิวภูมิประเทศสามมิติ"></canvas></div>
         <div class="lab-meta" id="lab-metrics"></div>
-        <p class="lab-note">ลากเพื่อหมุน · ใช้สองนิ้วเพื่อซูม · นี่คือ Heightfield แบบสองมิติที่สร้างเป็น Mesh จริง มีความสูง ความลาดชัน Normal และ Depth Buffer มุมมอง “โลกทั้งหมด” แสดงภูมิประเทศพร้อมผิวน้ำตามแนวลำน้ำ ส่วนมุมมองตรวจสอบใช้ดูข้อมูลความสูง ความลาดชัน และพื้นที่รับน้ำสะสม</p>
+        <p class="lab-note">ลากเพื่อหมุน · ใช้สองนิ้วเพื่อซูม · มุมมองโลกทั้งหมดแสดงภูมิประเทศและแนวแม่น้ำ ส่วนมุมมองตรวจสอบใช้ตรวจความสูง ความลาดชัน และข้อมูลการไหลของน้ำ</p>
       </section>
       <aside class="lab-panel lab-controls">
         <h2>ปรับแต่งภูเขา</h2>
@@ -59,8 +59,8 @@
         <label for="roughness">ความขรุขระ <output id="roughness-value"></output></label><input id="roughness" type="range" min="0" max=".28" step=".01" value=".1">
         <label for="detail-scale">ขนาดรายละเอียด <output id="detail-scale-value"></output></label><input id="detail-scale" type="range" min="1" max="5" step=".1" value="3.2">
         <label for="octaves">จำนวนชั้นรายละเอียด <output id="octaves-value"></output></label><input id="octaves" type="range" min="1" max="4" step="1" value="3">
-        <label for="debug-mode">มุมมองตรวจสอบ</label><select id="debug-mode">
-          <option value="shaded">พื้นผิวและแสง</option><option value="elevation">ระดับความสูง</option><option value="slope">ความลาดชัน</option><option value="normals">ทิศทางพื้นผิว</option><option value="wireframe">โครงตาข่าย</option><option value="hydrology">การไหลและลำน้ำ</option>
+        <label for="debug-mode">มุมมอง</label><select id="debug-mode">
+          <option value="world" selected>โลกทั้งหมด · ภูมิประเทศและแม่น้ำ</option><option value="shaded">พื้นผิวและแสง</option><option value="elevation">ระดับความสูง</option><option value="slope">ความลาดชัน</option><option value="normals">ทิศทางพื้นผิว</option><option value="wireframe">โครงตาข่าย</option><option value="hydrology">การไหลและลำน้ำ</option>
         </select>
         <div class="lab-actions"><button id="new-seed" type="button">สุ่ม Seed</button><button id="reset-terrain" type="button">คืนค่า</button></div>
         <label for="seed">Seed <output id="seed-value"></output></label><input id="seed" type="range" min="1" max="99999" step="1" value="18273">
