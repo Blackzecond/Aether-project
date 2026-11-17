@@ -27,7 +27,7 @@ const seedLabel = requiredElement<HTMLElement>("#seed-label");
 const resolutionLabel = requiredElement<HTMLElement>("#resolution-label");
 const nodeList = requiredElement<HTMLDivElement>("#node-list");
 const graphStatus = requiredElement<HTMLElement>("#graph-status");
-const graphMeta = requiredElement<HTMLElement>("#graph-meta");
+const graphMeta = requiredElement<HTMLElement>("#graph-count");
 const nodeTypeSelect = requiredElement<HTMLSelectElement>("#node-type");
 const context = (() => {
   const value = canvas.getContext("2d", { alpha: false, desynchronized: true });
