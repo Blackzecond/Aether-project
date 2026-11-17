@@ -214,9 +214,31 @@ function buildTreeGeometry(): Float32Array {
     let nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;const len=Math.hypot(nx,ny,nz)||1;nx/=len;ny/=len;nz/=len;
     for(const p of [a,b,d])out.push(p[0],p[1],p[2],nx,ny,nz);
   };
-  const cone=(bottom:number,top:number,radius:number,segments=7) => {const apex=[0,top,0];for(let i=0;i<segments;i++){const a=i/segments*Math.PI*2,b=(i+1)/segments*Math.PI*2;tri([Math.cos(a)*radius,bottom,Math.sin(a)*radius],apex,[Math.cos(b)*radius,bottom,Math.sin(b)*radius]);}};
-  const cylinder=(bottom:number,top:number,radius:number,segments=6) => {for(let i=0;i<segments;i++){const a=i/segments*Math.PI*2,b=(i+1)/segments*Math.PI*2,p1=[Math.cos(a)*radius,bottom,Math.sin(a)*radius],p2=[Math.cos(b)*radius,bottom,Math.sin(b)*radius],p3=[Math.cos(a)*radius,top,Math.sin(a)*radius],p4=[Math.cos(b)*radius,top,Math.sin(b)*radius];tri(p1,p3,p2);tri(p2,p3,p4);}};
-  cylinder(0,0.39,0.045);cone(0.16,0.61,0.34,9);cone(0.34,0.83,0.27,9);cone(0.54,1,0.19,9);
+  const cylinder=(bottom:number,top:number,radius:number,segments=8) => {
+    for(let i=0;i<segments;i++){
+      const a=i/segments*Math.PI*2,b=(i+1)/segments*Math.PI*2;
+      const p1=[Math.cos(a)*radius,bottom,Math.sin(a)*radius],p2=[Math.cos(b)*radius,bottom,Math.sin(b)*radius];
+      const p3=[Math.cos(a)*radius*0.58,top,Math.sin(a)*radius*0.58],p4=[Math.cos(b)*radius*0.58,top,Math.sin(b)*radius*0.58];
+      tri(p1,p3,p2);tri(p2,p3,p4);
+    }
+  };
+  const ellipsoid=(cx:number,cy:number,cz:number,rx:number,ry:number,rz:number,segments=9,rings=6)=>{
+    for(let y=0;y<rings;y++){
+      const v0=-Math.PI/2+y/rings*Math.PI,v1=-Math.PI/2+(y+1)/rings*Math.PI;
+      for(let x=0;x<segments;x++){
+        const a=x/segments*Math.PI*2,b=(x+1)/segments*Math.PI*2;
+        const p=(v:number,t:number)=>[cx+Math.cos(v)*Math.cos(t)*rx,cy+Math.sin(v)*ry,cz+Math.cos(v)*Math.sin(t)*rz];
+        tri(p(v0,a),p(v1,a),p(v1,b));tri(p(v0,a),p(v1,b),p(v0,b));
+      }
+    }
+  };
+  cylinder(0,0.68,0.045);
+  // Several overlapping leaf masses create a rounded, irregular broadleaf crown.
+  ellipsoid(0,0.72,0,0.25,0.25,0.23);
+  ellipsoid(-0.14,0.67,0.04,0.19,0.20,0.19);
+  ellipsoid(0.15,0.70,-0.05,0.20,0.21,0.18);
+  ellipsoid(0.02,0.84,0.12,0.18,0.18,0.18);
+  ellipsoid(-0.04,0.86,-0.13,0.18,0.17,0.17);
   return new Float32Array(out);
 }
 
@@ -546,8 +568,8 @@ export class TerrainPreviewRenderer {
     if (this.mode !== "first-person" || !this.field) return;
     const speed = 0.014 * Math.max(0, Math.min(deltaSeconds, 0.05));
     const sin = Math.sin(this.playerYaw), cos = Math.cos(this.playerYaw);
-    const dx = (-sin * forward + cos * right) * speed;
-    const dz = (-cos * forward - sin * right) * speed;
+    const dx = (sin * forward + cos * right) * speed;
+    const dz = (-cos * forward + sin * right) * speed;
     const b = this.field.bounds;
     const x = Math.max(b.minX + 0.008, Math.min(b.maxX - 0.008, this.playerX + dx));
     const z = Math.max(b.minZ + 0.008, Math.min(b.maxZ - 0.008, this.playerZ + dz));
