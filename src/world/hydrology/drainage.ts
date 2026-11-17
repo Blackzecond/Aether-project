@@ -91,6 +91,7 @@ export function buildDrainageField(field: Heightfield): DrainageField {
   const basinId = new Int32Array(count).fill(-1);
   const visited = new Uint8Array(count);
   const floodOrder = new Int32Array(count).fill(-1);
+  const orderToIndex = new Int32Array(count);
   const outletIndices: number[] = [];
   const heap = createMinHeap(filledElevation, floodOrder);
 
@@ -109,7 +110,8 @@ export function buildDrainageField(field: Heightfield): DrainageField {
   while (true) {
     const current = heap.pop();
     if (current === undefined) break;
-    floodOrder[current] = order++;
+    floodOrder[current] = order;
+    orderToIndex[order++] = current;
 
     const x = current % width;
     const z = Math.floor(current / width);
@@ -167,12 +169,14 @@ export function buildDrainageField(field: Heightfield): DrainageField {
   // Every destination has an earlier flood order, so reverse order safely
   // accumulates all upstream contributing area without sorting another array.
   for (let i = count - 1; i >= 0; i -= 1) {
-    const index = Array.prototype.indexOf.call(floodOrder, i) as number;
+    const index = orderToIndex[i];
     const downstream = flowTo[index];
-    if (downstream >= 0) {
-      accumulation[downstream] += accumulation[index];
-      basinId[index] = basinId[downstream] >= 0 ? basinId[downstream] : basinId[index];
-    }
+    if (downstream >= 0) accumulation[downstream] += accumulation[index];
+  }
+  for (let i = 0; i < count; i += 1) {
+    const index = orderToIndex[i];
+    const downstream = flowTo[index];
+    if (downstream >= 0) basinId[index] = basinId[downstream];
   }
 
   let maximumAccumulation = 0;
