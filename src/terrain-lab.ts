@@ -1,4 +1,4 @@
-import { DEFAULT_TERRAIN_RECIPE, generateTerrain, buildDrainageField, extractRiverNetwork, generateVegetation, type TerrainRecipe } from "./world";
+import { DEFAULT_TERRAIN_RECIPE, createHeightfield, buildDrainageField, extractRiverNetwork, generateVegetation, type TerrainRecipe } from "./world";\nimport type { VolumeMesh } from "./world/volume/density-world";
 import { TerrainPreviewRenderer, type TerrainViewMode } from "./render/webgl2/terrain-preview";
 const canvas=document.querySelector<HTMLCanvasElement>("#terrain-canvas")!;
 const status=document.querySelector<HTMLElement>("#lab-status")!;
@@ -13,29 +13,75 @@ function updateLabels():void {
   for(const [id,key] of controls){const input=document.querySelector<HTMLInputElement>(`#${id}`)!;document.querySelector<HTMLOutputElement>(`#${id}-value`)!.value=Number(input.value).toFixed(key==="detailOctaves"?0:2);}
   document.querySelector<HTMLOutputElement>("#seed-value")!.value=String(recipe.seed);
 }
-function render(refreshHydrology=true):void {
-  try {
-    const generated=generateTerrain(recipe);renderer.setTerrain(generated.heightfield);
-    const mode=document.querySelector<HTMLSelectElement>("#debug-mode")!.value as TerrainViewMode;renderer.setMode(mode);
-    const d=generated.diagnostics;
+interface DensityWorkerMessage {
+  readonly id:number;
+  readonly ok:boolean;
+  readonly error?:string;
+  readonly heightfield?:{readonly width:number;readonly height:number;readonly bounds:TerrainRecipe["bounds"] extends infer B?NonNullable<B>:never;readonly values:ArrayBuffer};
+  readonly mesh?:{readonly positions:ArrayBuffer;readonly normals:ArrayBuffer;readonly indices:ArrayBuffer;readonly vertexCount:number;readonly triangleCount:number};
+  readonly diagnostics?:{readonly samples:number;readonly vertices:number;readonly triangles:number;readonly occupiedSamples:number};
+}
+const densityWorker=new Worker(new URL("./world/volume/density-worker.ts",import.meta.url),{type:"module"});
+const device=navigator as Navigator&{deviceMemory?:number};
+const densityResolution=device.deviceMemory!==undefined&&device.deviceMemory<=4
+  ?{width:72,height:44,depth:72}
+  :device.deviceMemory!==undefined&&device.deviceMemory>=8&&(navigator.hardwareConcurrency??4)>=8
+    ?{width:112,height:64,depth:112}
+    :{width:88,height:52,depth:88};
+let requestId=0;
+let renderTimer:number|undefined;
+let latestRefreshHydrology=true;
+function finishRender(message:DensityWorkerMessage):void{
+  if(!message.ok||!message.heightfield||!message.mesh||!message.diagnostics){
+    status.textContent=message.error??"สร้างภูมิประเทศสามมิติไม่สำเร็จ";return;
+  }
+  try{
+    const field=createHeightfield(
+      message.heightfield.width,message.heightfield.height,
+      new Float32Array(message.heightfield.values),message.heightfield.bounds,
+    );
+    const mesh:VolumeMesh={
+      positions:new Float32Array(message.mesh.positions),
+      normals:new Float32Array(message.mesh.normals),
+      indices:new Uint32Array(message.mesh.indices),
+      vertexCount:message.mesh.vertexCount,triangleCount:message.mesh.triangleCount,
+    };
+    renderer.setVolumeTerrain(field,mesh);
+    const mode=document.querySelector<HTMLSelectElement>("#debug-mode")!.value as TerrainViewMode;
+    renderer.setMode(mode);
     let hydrologyMetrics="";
-    if((mode==="world" || mode==="first-person" || mode==="hydrology") && refreshHydrology){
-      const drainage=buildDrainageField(generated.heightfield);
-      const rivers=extractRiverNetwork(generated.heightfield,drainage);
-      renderer.setHydrology(generated.heightfield,drainage,rivers);
-      const vegetation=generateVegetation(generated.heightfield,recipe.seed,rivers);
+    if((mode==="world"||mode==="first-person"||mode==="hydrology")&&latestRefreshHydrology){
+      const drainage=buildDrainageField(field);
+      const rivers=extractRiverNetwork(field,drainage);
+      renderer.setHydrology(field,drainage,rivers);
+      const vegetation=generateVegetation(field,recipe.seed,rivers);
       renderer.setVegetation(vegetation.instances);renderer.setGroundCover(vegetation.groundCover);
-      hydrologyMetrics=`<span class="lab-chip">ต้นไม้ ${vegetation.diagnostics.trees.toLocaleString("th-TH")} ต้น</span><span class="lab-chip">พืชพื้น ${vegetation.diagnostics.groundCover.toLocaleString("th-TH")} จุด</span>`+`<span class="lab-chip">ทางน้ำ ${rivers.diagnostics.channelCellCount.toLocaleString("th-TH")} จุด</span><span class="lab-chip">ต้นน้ำ ${rivers.diagnostics.headwaterCount.toLocaleString("th-TH")}</span><span class="lab-chip">ทางออก ${rivers.diagnostics.outletCount.toLocaleString("th-TH")}</span><span class="lab-chip">สะสมสูงสุด ${drainage.diagnostics.maximumAccumulation.toLocaleString("th-TH")}</span>`;
+      hydrologyMetrics=`<span class="lab-chip">ต้นไม้ ${vegetation.diagnostics.trees.toLocaleString("th-TH")} ต้น</span><span class="lab-chip">พืชพื้น ${vegetation.diagnostics.groundCover.toLocaleString("th-TH")} จุด</span><span class="lab-chip">ทางน้ำ ${rivers.diagnostics.channelCellCount.toLocaleString("th-TH")} จุด</span><span class="lab-chip">ต้นน้ำ ${rivers.diagnostics.headwaterCount.toLocaleString("th-TH")}</span><span class="lab-chip">ทางออก ${rivers.diagnostics.outletCount.toLocaleString("th-TH")}</span><span class="lab-chip">สะสมสูงสุด ${drainage.diagnostics.maximumAccumulation.toLocaleString("th-TH")}</span>`;
     }
     renderer.resize();
-    metrics.innerHTML=`<span class="lab-chip">จุด ${generated.heightfield.values.length.toLocaleString("th-TH")}</span><span class="lab-chip">ต่ำสุด ${d.min.toFixed(3)}</span><span class="lab-chip">สูงสุด ${d.max.toFixed(3)}</span><span class="lab-chip">ความแปรปรวน ${d.variance.toFixed(4)}</span><span class="lab-chip">Slope เฉลี่ย ${d.slopeMean.toFixed(3)}</span>${hydrologyMetrics}`;
-    status.textContent="สร้างสำเร็จ · Seed "+recipe.seed;updateLabels();
-  } catch(error) {status.textContent=error instanceof Error?error.message:"สร้างภูมิประเทศไม่สำเร็จ";}
+    metrics.innerHTML=`<span class="lab-chip">จุดปริมาตร ${message.diagnostics.samples.toLocaleString("th-TH")}</span><span class="lab-chip">Vertices ${message.diagnostics.vertices.toLocaleString("th-TH")}</span><span class="lab-chip">Triangles ${message.diagnostics.triangles.toLocaleString("th-TH")}</span><span class="lab-chip">พื้นที่ทึบ ${message.diagnostics.occupiedSamples.toLocaleString("th-TH")}</span>${hydrologyMetrics}`;
+    status.textContent="สร้างโลกสามมิติสำเร็จ · Seed "+recipe.seed;updateLabels();
+  }catch(error){status.textContent=error instanceof Error?error.message:"สร้างโลกสามมิติไม่สำเร็จ";}
+}
+densityWorker.addEventListener("message",(event:MessageEvent<DensityWorkerMessage>)=>{
+  if(event.data.id!==requestId)return;
+  finishRender(event.data);
+});
+function render(refreshHydrology=true):void{
+  if(renderTimer!==undefined){window.clearTimeout(renderTimer);renderTimer=undefined;}
+  latestRefreshHydrology=refreshHydrology;
+  const id=++requestId;
+  status.textContent="กำลังสร้างภูมิประเทศสามมิติ…";
+  densityWorker.postMessage({id,recipe,resolution:densityResolution});
+}
+function scheduleRender(refreshHydrology:boolean):void{
+  if(renderTimer!==undefined)window.clearTimeout(renderTimer);
+  renderTimer=window.setTimeout(()=>render(refreshHydrology),140);
 }
 for(const [id,key] of controls){
   document.querySelector<HTMLInputElement>(`#${id}`)!.addEventListener("input",event=>{
     const value=Number((event.currentTarget as HTMLInputElement).value);
-    recipe={...recipe,landform:{...recipe.landform,[key]:value}};render(false);
+    recipe={...recipe,landform:{...recipe.landform,[key]:value}};scheduleRender(false);
   });
   document.querySelector<HTMLInputElement>(`#${id}`)!.addEventListener("change",()=>render());
 }
@@ -79,7 +125,7 @@ document.querySelectorAll<HTMLButtonElement>("[data-move]").forEach(button=>{
 });
 window.addEventListener("blur",stopMovement);
 document.querySelector<HTMLInputElement>("#seed")!.addEventListener("input",event=>{
-  recipe={...recipe,seed:Number((event.currentTarget as HTMLInputElement).value)};render(false);
+  recipe={...recipe,seed:Number((event.currentTarget as HTMLInputElement).value)};scheduleRender(false);
 });
 document.querySelector<HTMLInputElement>("#seed")!.addEventListener("change",()=>render());
 document.querySelector<HTMLButtonElement>("#new-seed")!.addEventListener("click",()=>{
@@ -92,5 +138,5 @@ document.querySelector<HTMLButtonElement>("#reset-terrain")!.addEventListener("c
   (document.querySelector<HTMLInputElement>("#seed")!).value=String(recipe.seed);render();
 });
 const observer=new ResizeObserver(()=>renderer.resize());observer.observe(canvas.parentElement!);
-window.addEventListener("beforeunload",()=>{observer.disconnect();renderer.dispose();});
+window.addEventListener("beforeunload",()=>{observer.disconnect();densityWorker.terminate();renderer.dispose();});
 render();
