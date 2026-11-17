@@ -2,6 +2,7 @@ import { buildHeightfieldMesh } from "../../world/mesh/heightfield-mesh";
 import { sampleElevation, type Heightfield } from "../../world/fields/heightfield";
 import type { DrainageField } from "../../world/hydrology/drainage";
 import type { RiverNetwork } from "../../world/hydrology/rivers";
+import type { VegetationInstance } from "../../world/ecology/vegetation";
 
 export type TerrainViewMode = "world" | "first-person" | "shaded" | "elevation" | "slope" | "normals" | "wireframe" | "hydrology";
 
@@ -97,6 +98,22 @@ void main() {
   outColor = vec4(color, 1.0);
 }`;
 
+
+const treeVertexSource = "#version 300 es\nprecision highp float;\nlayout(location=0) in vec3 aPosition;\nlayout(location=1) in vec3 aNormal;\nlayout(location=2) in vec3 iOffset;\nlayout(location=3) in float iScale;\nlayout(location=4) in float iTint;\nuniform mat4 uMvp;\nout vec3 vNormal;\nout float vHeight;\nout float vTint;\nvoid main(){vec3 world=aPosition*iScale+iOffset;vNormal=aNormal;vHeight=aPosition.y;vTint=iTint;gl_Position=uMvp*vec4(world,1.0);}";
+const treeFragmentSource = "#version 300 es\nprecision highp float;\nin vec3 vNormal;in float vHeight;in float vTint;out vec4 outColor;\nvoid main(){vec3 n=normalize(vNormal);vec3 light=normalize(vec3(-0.45,0.82,0.36));float diffuse=max(dot(n,light),0.0);vec3 bark=mix(vec3(0.19,0.13,0.085),vec3(0.34,0.23,0.13),vTint*0.55);vec3 leaf=mix(vec3(0.055,0.19,0.105),vec3(0.20,0.34,0.16),vTint*0.72);vec3 color=vHeight<0.38?bark:leaf;color*=0.42+diffuse*0.72;outColor=vec4(color,1.0);}";
+function buildTreeGeometry(): Float32Array {
+  const out: number[] = [];
+  const tri = (a:number[],b:number[],d:number[]) => {
+    const ux=b[0]-a[0],uy=b[1]-a[1],uz=b[2]-a[2],vx=d[0]-a[0],vy=d[1]-a[1],vz=d[2]-a[2];
+    let nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;const len=Math.hypot(nx,ny,nz)||1;nx/=len;ny/=len;nz/=len;
+    for(const p of [a,b,d])out.push(p[0],p[1],p[2],nx,ny,nz);
+  };
+  const cone=(bottom:number,top:number,radius:number,segments=7) => {const apex=[0,top,0];for(let i=0;i<segments;i++){const a=i/segments*Math.PI*2,b=(i+1)/segments*Math.PI*2;tri([Math.cos(a)*radius,bottom,Math.sin(a)*radius],[Math.cos(b)*radius,bottom,Math.sin(b)*radius],apex);}};
+  const cylinder=(bottom:number,top:number,radius:number,segments=6) => {for(let i=0;i<segments;i++){const a=i/segments*Math.PI*2,b=(i+1)/segments*Math.PI*2,p1=[Math.cos(a)*radius,bottom,Math.sin(a)*radius],p2=[Math.cos(b)*radius,bottom,Math.sin(b)*radius],p3=[Math.cos(a)*radius,top,Math.sin(a)*radius],p4=[Math.cos(b)*radius,top,Math.sin(b)*radius];tri(p1,p2,p3);tri(p2,p4,p3);}};
+  cylinder(0,0.39,0.045);cone(0.18,0.60,0.25);cone(0.37,0.81,0.19);cone(0.56,1,0.125);
+  return new Float32Array(out);
+}
+
 function compile(gl: WebGL2RenderingContext, type: number, source: string): WebGLShader {
   const shader = gl.createShader(type);
   if (!shader) throw new Error("ไม่สามารถสร้าง Shader ได้");
@@ -186,6 +203,13 @@ export class TerrainPreviewRenderer {
   private readonly waterVao: WebGLVertexArrayObject;
   private readonly waterBuffer: WebGLBuffer;
   private readonly waterMvpLocation: WebGLUniformLocation;
+  private readonly treeProgram: WebGLProgram;
+  private readonly treeVao: WebGLVertexArrayObject;
+  private readonly treeGeometryBuffer: WebGLBuffer;
+  private readonly treeInstanceBuffer: WebGLBuffer;
+  private readonly treeMvpLocation: WebGLUniformLocation;
+  private treeVertexCount = 0;
+  private treeCount = 0;
   private waterVertexCount = 0;
   private maximumAccumulation = 1;
   private vertexCount = 0;
@@ -229,6 +253,23 @@ export class TerrainPreviewRenderer {
     if(!waterVao||!waterBuffer) throw new Error("ไม่สามารถจองหน่วยความจำผิวน้ำได้");
     this.waterVao=waterVao;this.waterBuffer=waterBuffer;
     this.waterMvpLocation=gl.getUniformLocation(waterProgram,"uMvp")!;
+    const treeVs=compile(gl,gl.VERTEX_SHADER,treeVertexSource),treeFs=compile(gl,gl.FRAGMENT_SHADER,treeFragmentSource);
+    const treeProgram=gl.createProgram();if(!treeProgram)throw new Error("ไม่สามารถสร้าง Tree Program ได้");
+    gl.attachShader(treeProgram,treeVs);gl.attachShader(treeProgram,treeFs);gl.linkProgram(treeProgram);gl.deleteShader(treeVs);gl.deleteShader(treeFs);
+    if(!gl.getProgramParameter(treeProgram,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(treeProgram)??"Tree program link failed");
+    this.treeProgram=treeProgram;this.treeMvpLocation=gl.getUniformLocation(treeProgram,"uMvp")!;
+    const treeVao=gl.createVertexArray(),treeGeometry=gl.createBuffer(),treeInstances=gl.createBuffer();
+    if(!treeVao||!treeGeometry||!treeInstances)throw new Error("ไม่สามารถจองหน่วยความจำพืชพรรณได้");
+    this.treeVao=treeVao;this.treeGeometryBuffer=treeGeometry;this.treeInstanceBuffer=treeInstances;
+    const geometry=buildTreeGeometry();this.treeVertexCount=geometry.length/6;
+    gl.bindVertexArray(treeVao);gl.bindBuffer(gl.ARRAY_BUFFER,treeGeometry);gl.bufferData(gl.ARRAY_BUFFER,geometry,gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,24,0);
+    gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,3,gl.FLOAT,false,24,12);
+    gl.bindBuffer(gl.ARRAY_BUFFER,treeInstances);
+    gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,3,gl.FLOAT,false,20,0);gl.vertexAttribDivisor(2,1);
+    gl.enableVertexAttribArray(3);gl.vertexAttribPointer(3,1,gl.FLOAT,false,20,12);gl.vertexAttribDivisor(3,1);
+    gl.enableVertexAttribArray(4);gl.vertexAttribPointer(4,1,gl.FLOAT,false,20,16);gl.vertexAttribDivisor(4,1);
+    gl.bindVertexArray(null);
     gl.bindVertexArray(waterVao);gl.bindBuffer(gl.ARRAY_BUFFER,waterBuffer);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);gl.bindVertexArray(null);
 
     const vao = gl.createVertexArray();
@@ -293,8 +334,8 @@ export class TerrainPreviewRenderer {
         if (this.previousPinch > 0 && nextPinch > 0) this.distance = Math.max(this.fitDistance * 0.28, Math.min(this.fitDistance * 2.2, this.distance * this.previousPinch / nextPinch));
         this.previousPinch = nextPinch;
       } else if (this.mode === "first-person") {
-        this.playerYaw -= dx * 0.006;
-        this.playerPitch = Math.max(-1.05, Math.min(1.05, this.playerPitch - dy * 0.004));
+        this.playerYaw += dx * 0.008;
+        this.playerPitch = Math.max(-1.05, Math.min(1.05, this.playerPitch - dy * 0.006));
       } else {
         this.azimuth -= dx * 0.008;
         this.elevation = Math.max(0.16, Math.min(1.32, this.elevation + dy * 0.006));
@@ -349,7 +390,7 @@ export class TerrainPreviewRenderer {
 
   movePlayer(forward: number, right: number): void {
     if (this.mode !== "first-person" || !this.field) return;
-    const speed = 0.0003;
+    const speed = 0.0007;
     const sin = Math.sin(this.playerYaw), cos = Math.cos(this.playerYaw);
     const dx = (-sin * forward + cos * right) * speed;
     const dz = (-cos * forward - sin * right) * speed;
@@ -359,6 +400,12 @@ export class TerrainPreviewRenderer {
     this.playerX = x;
     this.playerZ = z;
     this.render();
+  }
+
+  setVegetation(instances: readonly VegetationInstance[]): void {
+    const data=new Float32Array(instances.length*5);
+    for(let i=0;i<instances.length;i++){const item=instances[i],offset=i*5;data[offset]=item.x;data[offset+1]=item.y;data[offset+2]=item.z;data[offset+3]=item.height;data[offset+4]=item.tint;}
+    this.treeCount=instances.length;this.gl.bindBuffer(this.gl.ARRAY_BUFFER,this.treeInstanceBuffer);this.gl.bufferData(this.gl.ARRAY_BUFFER,data,this.gl.DYNAMIC_DRAW);
   }
 
   setTerrain(field: Heightfield): void {
@@ -531,6 +578,7 @@ export class TerrainPreviewRenderer {
       gl.drawElements(gl.TRIANGLES, this.triangleCount, gl.UNSIGNED_INT, 0);
     }
     gl.bindVertexArray(null);
+    if((this.mode==="world" || this.mode==="first-person") && this.treeCount>0){gl.useProgram(this.treeProgram);gl.uniformMatrix4fv(this.treeMvpLocation,false,mvp);gl.bindVertexArray(this.treeVao);gl.drawArraysInstanced(gl.TRIANGLES,0,this.treeVertexCount,this.treeCount);gl.bindVertexArray(null);}
     if((this.mode==="world" || this.mode==="first-person") && this.waterVertexCount>0){
       gl.useProgram(this.waterProgram);gl.uniformMatrix4fv(this.waterMvpLocation,false,mvp);gl.bindVertexArray(this.waterVao);
       gl.disable(gl.CULL_FACE);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.drawArrays(gl.TRIANGLES,0,this.waterVertexCount);gl.disable(gl.BLEND);gl.enable(gl.CULL_FACE);gl.bindVertexArray(null);
@@ -548,5 +596,6 @@ export class TerrainPreviewRenderer {
     gl.deleteVertexArray(this.vao);
     gl.deleteProgram(this.program);
     gl.deleteBuffer(this.waterBuffer);gl.deleteVertexArray(this.waterVao);gl.deleteProgram(this.waterProgram);
+    gl.deleteBuffer(this.treeGeometryBuffer);gl.deleteBuffer(this.treeInstanceBuffer);gl.deleteVertexArray(this.treeVao);gl.deleteProgram(this.treeProgram);
   }
 }
