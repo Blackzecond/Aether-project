@@ -48,6 +48,22 @@ uniform float uMaxAccumulation;
 uniform vec3 uCameraPosition;
 out vec4 outColor;
 
+float hash21(vec2 p) {
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 45.32);
+  return fract(p.x * p.y);
+}
+float noise2(vec2 p) {
+  vec2 i=floor(p),f=fract(p);
+  f=f*f*(3.0-2.0*f);
+  return mix(mix(hash21(i),hash21(i+vec2(1.0,0.0)),f.x),
+             mix(hash21(i+vec2(0.0,1.0)),hash21(i+vec2(1.0,1.0)),f.x),f.y);
+}
+float fbm2(vec2 p) {
+  float value=0.0,amplitude=0.5;
+  for(int i=0;i<4;i++){value+=noise2(p)*amplitude;p=p*2.03+vec2(17.1,9.2);amplitude*=0.5;}
+  return value;
+}
 vec3 terrainColor(float height, float slope) {
   vec3 low = vec3(0.105, 0.205, 0.17);
   vec3 grass = vec3(0.29, 0.43, 0.29);
@@ -82,6 +98,18 @@ void main() {
     color = n * 0.5 + 0.5;
   } else {
     vec3 base = terrainColor(height, slope);
+    vec2 texCoord = vPosition.xz;
+    float broadTexture = fbm2(texCoord * 18.0);
+    float stoneGrain = fbm2(texCoord * 74.0);
+    float fineGrain = noise2(texCoord * 190.0);
+    float rockExposure = smoothstep(0.34, 0.68, slope);
+    float striation = 1.0 - abs(noise2(texCoord * 31.0 + vec2(height * 7.0, height * 3.0)) * 2.0 - 1.0);
+    vec3 earthTint = vec3(0.78, 0.76, 0.65) * (0.82 + broadTexture * 0.32);
+    vec3 rockTint = vec3(0.68, 0.66, 0.59) * (0.76 + broadTexture * 0.42);
+    rockTint *= 0.91 + striation * 0.12;
+    base = mix(base * (0.88 + broadTexture * 0.24), earthTint, (1.0 - rockExposure) * 0.12);
+    base = mix(base, rockTint, rockExposure * 0.58);
+    base *= 0.94 + stoneGrain * 0.12 + fineGrain * 0.035;
     vec3 lightDirection = normalize(vec3(-0.55, 0.82, 0.42));
     vec3 viewDirection = normalize(uCameraPosition - vPosition);
     vec3 halfDirection = normalize(lightDirection + viewDirection);
