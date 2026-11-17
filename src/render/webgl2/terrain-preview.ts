@@ -623,9 +623,11 @@ export class TerrainPreviewRenderer {
     }
     const accumulation = new Float32Array(this.vertexCount);
     const channels = new Float32Array(this.vertexCount);
-    for (let i = 0; i < this.surfaceVertexCount; i += 1) {
-      accumulation[i] = drainage.accumulation[i];
-      channels[i] = rivers.channelMask[i];
+    if (!this.usesVolumeMesh) {
+      for (let i = 0; i < this.surfaceVertexCount; i += 1) {
+        accumulation[i] = drainage.accumulation[i];
+        channels[i] = rivers.channelMask[i];
+      }
     }
     this.maximumAccumulation = Math.max(1, drainage.diagnostics.maximumAccumulation);
     const gl = this.gl;
