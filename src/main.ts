@@ -204,14 +204,6 @@ function renderGraphEditor(): void {
     const ports = createElement("div", "node-ports");
     const inputGroup = createElement("div", "port-group");
     inputGroup.append(createElement("span", "port-heading", "INPUT"));
-    for (const port of definition.inputs) {
-      const button = createElement("button", "port-button input-port", "← " + port);
-      button.type = "button";
-      button.dataset.action = "connect-input";
-      button.dataset.nodeId = node.id;
-      button.dataset.port = port;
-      ports.append(button);
-    }
     if (definition.inputs.length === 0) {
       inputGroup.append(createElement("span", "port-empty", "ไม่มีช่องรับ"));
     } else {
@@ -334,7 +326,11 @@ nodeList.addEventListener("click", (event) => {
       return;
     }
     const edge = {
-      id: "edge-" + edgeCounter++,
+      id: (() => {
+        let candidate = "edge-" + edgeCounter++;
+        while (graphState.edges.some((item) => item.id === candidate)) candidate = "edge-" + edgeCounter++;
+        return candidate;
+      })(),
       fromNodeId: selectedOutput.nodeId,
       fromPort: selectedOutput.port,
       toNodeId: nodeId,
@@ -383,7 +379,8 @@ nodeList.addEventListener("change", (event) => {
 
 requiredElement<HTMLButtonElement>("#add-node").addEventListener("click", () => {
   const type = nodeTypeSelect.value;
-  const id = "node-" + nodeCounter++;
+  let id = "node-" + nodeCounter++;
+  while (graphState.nodes.some((node) => node.id === id)) id = "node-" + nodeCounter++;
   const params: Record<string, GraphValue> = type === "number.constant"
     ? { value: 1 }
     : type === "math.clamp" ? { min: 0, max: 1 } : {};
