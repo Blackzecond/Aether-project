@@ -198,10 +198,12 @@ describe("world foundation v2", () => {
     expect(first.instances.every(tree => tree.height > 0 && tree.y > 0
       && tree.x >= field.bounds.minX && tree.x <= field.bounds.maxX
       && tree.z >= field.bounds.minZ && tree.z <= field.bounds.maxZ)).toBe(true);
+    expect(first.instances.every(tree => Math.abs(tree.y - sampleElevation(field, tree.x, tree.z)) < 0.001)).toBe(true);
     expect(first.groundCover).toEqual(second.groundCover);
     expect(first.groundCover.length).toBeGreaterThan(0);
     expect(first.diagnostics.groundCover).toBe(first.groundCover.length);
     expect(first.groundCover.every(item => [0, 1, 2, 3].includes(item.kind))).toBe(true);
+    expect(first.groundCover.every(item => Math.abs(item.y - sampleElevation(field, item.x, item.z)) < 0.001)).toBe(true);
     expect(first.groundCover.every(item => item.scale > 0 && item.y > 0
       && item.x >= field.bounds.minX && item.x <= field.bounds.maxX
       && item.z >= field.bounds.minZ && item.z <= field.bounds.maxZ)).toBe(true);
