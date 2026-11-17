@@ -85,8 +85,8 @@ export function generateVegetation(
   }
 
   // Ground cover is much denser and follows moisture, slope and exposed rock.
-  for (let gz = 2; gz < field.height - 2; gz += 2) {
-    for (let gx = 2; gx < field.width - 2; gx += 2) {
+  for (let gz = 2; gz < field.height - 2; gz += 1) {
+    for (let gx = 2; gx < field.width - 2; gx += 1) {
       const jitterX = (hash(seed + 131, gx, gz) - 0.5) * 1.45;
       const jitterZ = (hash(seed + 149, gx, gz) - 0.5) * 1.45;
       const gridX = Math.max(1, Math.min(field.width - 2, gx + jitterX));
