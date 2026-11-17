@@ -675,32 +675,35 @@ export class TerrainPreviewRenderer {
         current=rivers.downstream[current];
         path.push(current);
       }
+      const sections:{x:number;z:number;y:number;w:number}[]=[];
+      const subdivisions=8;
       for(let segment=0;segment<path.length-1;segment++){
-        const aIndex=path[segment],bIndex=path[segment+1];
-        const key=aIndex+":"+bIndex;
-        if(renderedSegments.has(key))continue;
-        renderedSegments.add(key);
         const p0=point(path[Math.max(0,segment-1)]);
-        const p1=point(aIndex);
-        const p2=point(bIndex);
+        const p1=point(path[segment]);
+        const p2=point(path[segment+1]);
         const p3=point(path[Math.min(path.length-1,segment+2)]);
-        const sections:{x:number;z:number;y:number;w:number}[]=[];
-        const subdivisions=4;
-        for(let step=0;step<=subdivisions;step++){
+        for(let step=0;step<subdivisions;step++){
           const t=step/subdivisions;
           const x=catmull(p0.x,p1.x,p2.x,p3.x,t);
           const z=catmull(p0.z,p1.z,p2.z,p3.z,t);
-          const width=Math.max(0.0012,catmull(p0.w,p1.w,p2.w,p3.w,t));
+          const width=Math.max(0.0009,catmull(p0.w,p1.w,p2.w,p3.w,t));
           sections.push({x,z,y:sampleElevation(field,x,z)+0.0018,w:width});
         }
-        for(let step=0;step<subdivisions;step++){
-          const a=sections[step],b=sections[step+1];
-          const dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz)||1;
-          const nx=-dz/len,nz=dx/len;
-          const aL=[a.x+nx*a.w,a.y,a.z+nz*a.w],aR=[a.x-nx*a.w,a.y,a.z-nz*a.w];
-          const bL=[b.x+nx*b.w,b.y,b.z+nz*b.w],bR=[b.x-nx*b.w,b.y,b.z-nz*b.w];
-          water.push(...aL,...aR,...bL,...aR,...bR,...bL);
-        }
+      }
+      const last=point(path[path.length-1]);
+      sections.push({...last,y:sampleElevation(field,last.x,last.z)+0.0018});
+      const edges=sections.map((section,index)=>{
+        const previous=sections[Math.max(0,index-1)],next=sections[Math.min(sections.length-1,index+1)];
+        const dx=next.x-previous.x,dz=next.z-previous.z,length=Math.hypot(dx,dz)||1;
+        const nx=-dz/length,nz=dx/length;
+        return{
+          left:[section.x+nx*section.w,section.y,section.z+nz*section.w],
+          right:[section.x-nx*section.w,section.y,section.z-nz*section.w],
+        };
+      });
+      for(let i=0;i<edges.length-1;i++){
+        const a=edges[i],b=edges[i+1];
+        water.push(...a.left,...a.right,...b.left,...a.right,...b.right,...b.left);
       }
     }
     this.waterVertexCount=water.length/3;
