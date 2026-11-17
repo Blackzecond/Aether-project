@@ -15,9 +15,11 @@ export interface GraphEdge {
   readonly toNodeId: string;
   readonly toPort: string;
 }
+export interface GraphNodePosition { readonly x: number; readonly y: number; }
 export interface GraphDocument {
   readonly nodes: readonly GraphNode[];
   readonly edges: readonly GraphEdge[];
+  readonly layout?: Readonly<Record<string, GraphNodePosition>>;
 }
 export interface GraphNodeDefinition {
   readonly type: string;
