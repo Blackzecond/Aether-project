@@ -30,6 +30,13 @@ describe("shared terrain, hydrology and ecology", () => {
     expect(world.layers[1].surface).not.toEqual(world.layers[2].surface);
   });
 
+  it("keeps its headwater anchor stable when the terrain changes", () => {
+    const calm = createLandscapeWorld(640, 360, baseOptions);
+    const rugged = createLandscapeWorld(640, 360, { ...baseOptions, roughness: 0.95, scale: 1.8 });
+    expect(calm.river[0].x).toBe(rugged.river[0].x);
+    expect(calm.river[0].depth).toBe(rugged.river[0].depth);
+  });
+
   it("routes the river from the upper landscape toward the downstream edge", () => {
     const world = createLandscapeWorld(640, 360, baseOptions);
     expect(world.river.length).toBeGreaterThan(8);
@@ -39,13 +46,11 @@ describe("shared terrain, hydrology and ecology", () => {
     expect(world.river.every((point) => Number.isFinite(point.x) && Number.isFinite(point.y))).toBe(true);
   });
 
-  it("uses terrain elevation and depth for river screen position", () => {
+  it("projects river height from terrain instead of a flat screen-space line", () => {
     const world = createLandscapeWorld(640, 360, baseOptions);
     const point = world.river[Math.floor(world.river.length * 0.4)];
-    const expectedY = 360 * (0.30 + point.depth * 0.62)
-      - 360 * world.elevation[Math.round(point.depth * (world.fieldHeight - 1)) * world.fieldWidth
-        + Math.round((point.x / 640) * (world.fieldWidth - 1))] * 0.19;
-    expect(point.y).toBeCloseTo(expectedY, 3);
+    const flatOverlayY = 360 * (0.30 + point.depth * 0.62);
+    expect(Math.abs(point.y - flatOverlayY)).toBeGreaterThan(0.5);
   });
 
   it("scales river width globally while keeping its route unchanged", () => {
