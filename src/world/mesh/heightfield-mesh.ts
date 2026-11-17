@@ -23,9 +23,7 @@ export function buildHeightfieldMesh(field: Heightfield, verticalScale = 1): Ter
   const wallStart = surfaceCount;
   const bottomStart = wallStart + perimeter.length * 2;
   const bottomCenter = bottomStart;
-  const groundStart = bottomCenter + 1;
-  const groundCenter = groundStart + perimeter.length;
-  const vertexCount = groundCenter + 1;
+  const vertexCount = bottomCenter + 1;
   const positions = new Float32Array(vertexCount * 3);
   const normals = new Float32Array(vertexCount * 3);
   const put = (index: number, x: number, y: number, z: number, nx: number, ny: number, nz: number): void => {
@@ -84,40 +82,7 @@ export function buildHeightfieldMesh(field: Heightfield, verticalScale = 1): Ter
     indices.push(bottomCenter, bottomA, bottomB);
   });
 
-  // Extend the terrain edge into a broad, gently descending apron.
-  // This replaces the isolated flat plane with connected world geometry.
-  const groundMargin = 20;
-  perimeter.forEach((surfaceIndex, i) => {
-    const p = surfaceIndex * 3;
-    const x = positions[p], z = positions[p + 2];
-    const outerX = x < (bounds.minX + bounds.maxX) * 0.5 ? bounds.minX - groundMargin : bounds.maxX + groundMargin;
-    const outerZ = z < (bounds.minZ + bounds.maxZ) * 0.5 ? bounds.minZ - groundMargin : bounds.maxZ + groundMargin;
-    const isHorizontalEdge = surfaceIndex < width || surfaceIndex >= (height - 1) * width;
-    const ox = isHorizontalEdge ? x : outerX;
-    const oz = isHorizontalEdge ? outerZ : z;
-    const cornerX = x === bounds.minX || x === bounds.maxX;
-    const cornerZ = z === bounds.minZ || z === bounds.maxZ;
-    const finalX = cornerX ? outerX : ox;
-    const finalZ = cornerZ ? outerZ : oz;
-    put(groundStart + i, finalX, baseY, finalZ, 0, 1, 0);
-    const next = (i + 1) % perimeter.length;
-    const topA = surfaceIndex;
-    const topB = perimeter[next];
-    const apronA = groundStart + i;
-    const apronB = groundStart + next;
-    indices.push(topA, topB, apronA, topB, apronB, apronA);
-  });
-  put(
-    groundCenter,
-    (bounds.minX + bounds.maxX) * 0.5,
-    baseY,
-    (bounds.minZ + bounds.maxZ) * 0.5,
-    0, 1, 0,
-  );
-  perimeter.forEach((_, i) => {
-    const next = (i + 1) % perimeter.length;
-    indices.push(groundCenter, groundStart + next, groundStart + i);
-  });
+
 
   const indexArray = new Uint32Array(indices);
   return { positions, normals, indices: indexArray, vertexCount, triangleCount: indexArray.length / 3 };
