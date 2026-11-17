@@ -54,6 +54,21 @@ describe("evaluateGraph", () => {
     expect(() => evaluateGraph(graph, registry)).toThrow(/multiple connections/);
   });
 
+  it("uses safe defaults for unconnected math nodes", () => {
+    const graph: GraphDocument = {
+      nodes: [
+        { id: "sum", type: "math.add" },
+        { id: "product", type: "math.multiply" },
+        { id: "clamp", type: "math.clamp" },
+      ],
+      edges: [],
+    };
+    const result = evaluateGraph(graph, registry);
+    expect(result.values.get("sum")?.value).toBe(0);
+    expect(result.values.get("product")?.value).toBe(1);
+    expect(result.values.get("clamp")?.value).toBe(0);
+  });
+
   it("rejects non-finite constant values", () => {
     const graph: GraphDocument = {
       nodes: [{ id: "bad", type: "number.constant", params: { value: Number.NaN } }],
