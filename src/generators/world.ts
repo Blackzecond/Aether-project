@@ -94,8 +94,8 @@ export function createLandscapeWorld(width: number, height: number, options: Lan
       const valley = findValley(nearTerrain, previousX * 0.72 + desired * 0.28, searchRadius);
       const xNorm = Math.max(0.06, Math.min(0.94, valley * 0.62 + desired * 0.38));
       previousX = xNorm;
-      const terrainY = sampleSurface(nearTerrain, xNorm * width, width);
-      const y = Math.max(terrainY + height * 0.012, terrainY + t * (height * 0.23) + height * 0.012);
+      const valleyStartY = sampleSurface(middleTerrain, anchor * width, width) * height + height * 0.012;
+      const y = valleyStartY + t * (height * 1.08 - valleyStartY);
       const perspective = Math.pow(t, 1.55);
       const riverWidth = width * (0.0025 + riverStrength * 0.145 * perspective);
       river.push({ x: xNorm * width, y: Math.min(height * 1.08, y), width: riverWidth });
