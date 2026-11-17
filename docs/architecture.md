@@ -33,4 +33,4 @@ Water, vegetation, atmosphere and other systems must receive the same world mode
 
 ## Current limitation
 
-The present terrain generator is an initial landform model, not an accepted final mountain synthesis system. The Terrain Lab is the acceptance surface. Do not proceed to hydrology or ecology until mountain geometry, parameter response, camera framing and mobile rendering are visually accepted.
+The present terrain generator is an initial landform model, not an accepted final mountain synthesis system. The Terrain Lab includes terrain and hydrology diagnostic views, but visual acceptance is still outstanding while deployment is blocked. Do not add channel incision, a water surface or ecology until mountain geometry, parameter response, camera framing, routing and mobile rendering are visually reviewed.
