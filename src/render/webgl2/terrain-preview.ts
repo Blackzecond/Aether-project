@@ -3,7 +3,7 @@ import { sampleElevation, type Heightfield } from "../../world/fields/heightfiel
 import type { DrainageField } from "../../world/hydrology/drainage";
 import type { RiverNetwork } from "../../world/hydrology/rivers";
 import type { GroundCoverInstance, VegetationInstance } from "../../world/ecology/vegetation";
-import type { VolumeMesh, VolumeMeshChunk } from "../../world/volume/density-world";
+import type { VolumeMesh, VolumeMeshChunk, VolumeMeshLod } from "../../world/volume/density-world";
 
 export type TerrainViewMode = "world" | "first-person" | "shaded" | "elevation" | "slope" | "normals" | "wireframe" | "hydrology";
 
@@ -286,7 +286,7 @@ function multiply(a: Float32Array, b: Float32Array): Float32Array {
 
 const MODE: Record<TerrainViewMode, number> = { world: 0, "first-person": 0, shaded: 0, elevation: 1, slope: 2, normals: 3, wireframe: 4, hydrology: 5 };
 
-export class TerrainPreviewRenderer {
+interface VolumeLodGpu {readonly vao:WebGLVertexArrayObject;readonly indexBuffer:WebGLBuffer;readonly chunks:readonly VolumeMeshChunk[];readonly indexCount:number}\n\nexport class TerrainPreviewRenderer {
   private readonly gl: WebGL2RenderingContext;
   private readonly program: WebGLProgram;
   private readonly vao: WebGLVertexArrayObject;
@@ -327,7 +327,7 @@ export class TerrainPreviewRenderer {
   private vertexCount = 0;
   private surfaceVertexCount = 0;
   private usesVolumeMesh = false;
-  private volumeChunks: readonly VolumeMeshChunk[] = [];
+  private volumeChunks: readonly VolumeMeshChunk[] = [];\n  private volumeLodGpu:VolumeLodGpu[]=[];
   private triangleCount = 0;
   private lineCount = 0;
   private mode: TerrainViewMode = "world";
@@ -568,7 +568,7 @@ export class TerrainPreviewRenderer {
   }
 
   setVolumeTerrain(field: Heightfield,mesh:VolumeMesh):void {
-    this.uploadTerrainMesh(field,mesh,true,mesh.chunks);
+    this.uploadTerrainMesh(field,mesh,true,mesh.chunks,mesh.lods);
   }
 
   private uploadTerrainMesh(
@@ -617,6 +617,25 @@ export class TerrainPreviewRenderer {
     gl.bindVertexArray(null);
     this.triangleCount=mesh.indices.length;
     this.lineCount=lines.length;
+    for(const old of this.volumeLodGpu.slice(1)){gl.deleteBuffer(old.indexBuffer);gl.deleteVertexArray(old.vao);}
+    this.volumeLodGpu=[];
+    if(volume&&lods.length>0){
+      this.volumeLodGpu.push({vao:this.vao,indexBuffer:this.indexBuffer,chunks:lods[0].chunks,indexCount:lods[0].indices.length});
+      for(const lod of lods.slice(1)){
+        const vao=gl.createVertexArray(),position=gl.createBuffer(),normal=gl.createBuffer(),indices=gl.createBuffer();
+        if(!vao||!position||!normal||!indices)continue;
+        gl.bindVertexArray(vao);
+        gl.bindBuffer(gl.ARRAY_BUFFER,position);gl.bufferData(gl.ARRAY_BUFFER,lod.positions,gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,0,0);
+        gl.bindBuffer(gl.ARRAY_BUFFER,normal);gl.bufferData(gl.ARRAY_BUFFER,lod.normals,gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,3,gl.FLOAT,false,0,0);
+        gl.disableVertexAttribArray(2);gl.vertexAttrib1f(2,0);
+        gl.disableVertexAttribArray(3);gl.vertexAttrib1f(3,0);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,indices);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,lod.indices,gl.STATIC_DRAW);
+        gl.bindVertexArray(null);
+        this.volumeLodGpu.push({vao,indexBuffer:indices,chunks:lod.chunks,indexCount:lod.indices.length});
+      }
+    }
     this.render();
   }
 
@@ -748,7 +767,9 @@ export class TerrainPreviewRenderer {
     gl.uniform1i(this.modeLocation, MODE[this.mode]);
     gl.uniform3f(this.cameraLocation, camera[0], camera[1], camera[2]);
     gl.uniform1f(this.maxAccumulationLocation, this.maximumAccumulation);
-    gl.bindVertexArray(this.vao);
+    const lodIndex=exploring?0:(this.distance<this.fitDistance*0.92?0:this.distance<this.fitDistance*1.55?1:2);
+    const activeLod=this.usesVolumeMesh?this.volumeLodGpu[Math.min(lodIndex,this.volumeLodGpu.length-1)]:undefined;
+    gl.bindVertexArray(activeLod?.vao??this.vao);
 
     if (this.mode === "wireframe") {
       gl.disable(gl.CULL_FACE);
@@ -756,15 +777,17 @@ export class TerrainPreviewRenderer {
       gl.drawElements(gl.LINES, this.lineCount, gl.UNSIGNED_INT, 0);
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
       gl.enable(gl.CULL_FACE);
-    } else if(exploring&&this.volumeChunks.length>0){
+    } else if(exploring&&activeLod&&activeLod.chunks.length>0){
       const rangeSquared=0.42*0.42;
-      for(const chunk of this.volumeChunks){
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,activeLod.indexBuffer);
+      for(const chunk of activeLod.chunks){
         const dx=chunk.centerX-camera[0],dz=chunk.centerZ-camera[2];
         if(dx*dx+dz*dz>rangeSquared)continue;
         gl.drawElements(gl.TRIANGLES,chunk.indexCount,gl.UNSIGNED_INT,chunk.startIndex*Uint32Array.BYTES_PER_ELEMENT);
       }
     } else {
-      gl.drawElements(gl.TRIANGLES, this.triangleCount, gl.UNSIGNED_INT, 0);
+      if(activeLod)gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,activeLod.indexBuffer);
+      gl.drawElements(gl.TRIANGLES,activeLod?.indexCount??this.triangleCount,gl.UNSIGNED_INT,0);
     }
     gl.bindVertexArray(null);
     let treeDrawCount=this.treeCount,groundDrawCount=this.groundCount;
@@ -816,7 +839,7 @@ export class TerrainPreviewRenderer {
     gl.deleteBuffer(this.indexBuffer);
     gl.deleteBuffer(this.lineBuffer);
     gl.deleteBuffer(this.accumulationBuffer);
-    gl.deleteBuffer(this.channelBuffer);
+    gl.deleteBuffer(this.channelBuffer);\n    for(const lod of this.volumeLodGpu.slice(1)){gl.deleteBuffer(lod.indexBuffer);gl.deleteVertexArray(lod.vao);}
     gl.deleteVertexArray(this.vao);
     gl.deleteProgram(this.program);
     gl.deleteBuffer(this.waterBuffer);gl.deleteVertexArray(this.waterVao);gl.deleteProgram(this.waterProgram);
