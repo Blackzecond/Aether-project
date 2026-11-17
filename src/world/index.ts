@@ -7,3 +7,5 @@ export * from "./mesh/heightfield-mesh";
 
 export * from "./hydrology/drainage";
 export * from "./hydrology/rivers";
+
+export * from "./ecology/vegetation";
