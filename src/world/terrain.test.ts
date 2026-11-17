@@ -22,9 +22,17 @@ describe("world foundation v2", () => {
     const relief = generateTerrain(recipe({ relief: 1.15 }));
     const rough = generateTerrain(recipe({ roughness: 0.48 }));
     const sharp = generateTerrain(recipe({ peakSharpness: 0.95 }));
+    const spaced = generateTerrain(recipe({ mountainSpacing: 1.45 }));
+    const irregular = generateTerrain(recipe({ ridgeIrregularity: 0.9 }));
+    const fineDetail = generateTerrain(recipe({ detailScale: 10.5 }));
+    const moreOctaves = generateTerrain(recipe({ detailOctaves: 6 }));
     expect(relief.diagnostics.mean).not.toBeCloseTo(base.diagnostics.mean, 3);
     expect(rough.diagnostics.variance).not.toBeCloseTo(base.diagnostics.variance, 5);
     expect(sharp.heightfield.values).not.toEqual(base.heightfield.values);
+    expect(spaced.heightfield.values).not.toEqual(base.heightfield.values);
+    expect(irregular.heightfield.values).not.toEqual(base.heightfield.values);
+    expect(fineDetail.heightfield.values).not.toEqual(base.heightfield.values);
+    expect(moreOctaves.heightfield.values).not.toEqual(base.heightfield.values);
   });
   it("samples surface normal, slope and curvature", () => {
     const field = generateTerrain(recipe()).heightfield;
