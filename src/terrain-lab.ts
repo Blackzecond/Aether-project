@@ -13,13 +13,13 @@ function updateLabels():void {
   for(const [id,key] of controls){const input=document.querySelector<HTMLInputElement>(`#${id}`)!;document.querySelector<HTMLOutputElement>(`#${id}-value`)!.value=Number(input.value).toFixed(key==="detailOctaves"?0:2);}
   document.querySelector<HTMLOutputElement>("#seed-value")!.value=String(recipe.seed);
 }
-function render():void {
+function render(refreshHydrology=true):void {
   try {
     const generated=generateTerrain(recipe);renderer.setTerrain(generated.heightfield);
     const mode=document.querySelector<HTMLSelectElement>("#debug-mode")!.value as TerrainViewMode;renderer.setMode(mode);
     const d=generated.diagnostics;
     let hydrologyMetrics="";
-    if(mode==="hydrology"){
+    if(mode==="hydrology" && refreshHydrology){
       const drainage=buildDrainageField(generated.heightfield);
       const rivers=extractRiverNetwork(generated.heightfield,drainage);
       renderer.setHydrology(drainage,rivers);
@@ -33,14 +33,16 @@ function render():void {
 for(const [id,key] of controls){
   document.querySelector<HTMLInputElement>(`#${id}`)!.addEventListener("input",event=>{
     const value=Number((event.currentTarget as HTMLInputElement).value);
-    recipe={...recipe,landform:{...recipe.landform,[key]:value}};render();
+    recipe={...recipe,landform:{...recipe.landform,[key]:value}};render(false);
   });
+  document.querySelector<HTMLInputElement>(`#${id}`)!.addEventListener("change",()=>render());
 }
 document.querySelector<HTMLButtonElement>("#reset-camera")!.addEventListener("click",()=>renderer.resetCamera());
 document.querySelector<HTMLSelectElement>("#debug-mode")!.addEventListener("change",()=>render());
 document.querySelector<HTMLInputElement>("#seed")!.addEventListener("input",event=>{
-  recipe={...recipe,seed:Number((event.currentTarget as HTMLInputElement).value)};render();
+  recipe={...recipe,seed:Number((event.currentTarget as HTMLInputElement).value)};render(false);
 });
+document.querySelector<HTMLInputElement>("#seed")!.addEventListener("change",()=>render());
 document.querySelector<HTMLButtonElement>("#new-seed")!.addEventListener("click",()=>{
   const seed=Math.floor(Math.random()*99999)+1;recipe={...recipe,seed};
   (document.querySelector<HTMLInputElement>("#seed")!).value=String(seed);render();
