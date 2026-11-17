@@ -19,7 +19,7 @@ function render(refreshHydrology=true):void {
     const mode=document.querySelector<HTMLSelectElement>("#debug-mode")!.value as TerrainViewMode;renderer.setMode(mode);
     const d=generated.diagnostics;
     let hydrologyMetrics="";
-    if((mode==="world" || mode==="hydrology") && refreshHydrology){
+    if((mode==="world" || mode==="first-person" || mode==="hydrology") && refreshHydrology){
       const drainage=buildDrainageField(generated.heightfield);
       const rivers=extractRiverNetwork(generated.heightfield,drainage);
       renderer.setHydrology(generated.heightfield,drainage,rivers);
@@ -38,7 +38,27 @@ for(const [id,key] of controls){
   document.querySelector<HTMLInputElement>(`#${id}`)!.addEventListener("change",()=>render());
 }
 document.querySelector<HTMLButtonElement>("#reset-camera")!.addEventListener("click",()=>renderer.resetCamera());
-document.querySelector<HTMLSelectElement>("#debug-mode")!.addEventListener("change",()=>render());
+document.querySelector<HTMLSelectElement>("#debug-mode")!.addEventListener("change",()=>{
+  const mode=document.querySelector<HTMLSelectElement>("#debug-mode")!.value;
+  document.querySelector<HTMLElement>(".lab-canvas")!.classList.toggle("is-exploring",mode==="first-person");
+  render();
+});
+const movementKeys=new Set(["w","a","s","d","arrowup","arrowdown","arrowleft","arrowright"]);
+window.addEventListener("keydown",event=>{
+  if(!movementKeys.has(event.key.toLowerCase()) || event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
+  if(document.querySelector<HTMLSelectElement>("#debug-mode")!.value!=="first-person") return;
+  event.preventDefault();
+  const key=event.key.toLowerCase();
+  renderer.movePlayer(key==="w"||key==="arrowup"?1:key==="s"||key==="arrowdown"?-1:0,key==="d"||key==="arrowright"?1:key==="a"||key==="arrowleft"?-1:0);
+});
+let movementTimer:number|undefined;
+const stopMovement=():void=>{if(movementTimer!==undefined){window.clearInterval(movementTimer);movementTimer=undefined;}};
+document.querySelectorAll<HTMLButtonElement>("[data-move]").forEach(button=>{
+  const move=():void=>{const direction=button.dataset.move!;renderer.movePlayer(direction==="forward"?1:direction==="back"?-1:0,direction==="right"?1:direction==="left"?-1:0);};
+  button.addEventListener("pointerdown",event=>{event.preventDefault();stopMovement();move();movementTimer=window.setInterval(move,100);});
+  for(const name of ["pointerup","pointercancel","pointerleave"])button.addEventListener(name,stopMovement);
+});
+window.addEventListener("blur",stopMovement);
 document.querySelector<HTMLInputElement>("#seed")!.addEventListener("input",event=>{
   recipe={...recipe,seed:Number((event.currentTarget as HTMLInputElement).value)};render(false);
 });
