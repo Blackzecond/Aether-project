@@ -534,15 +534,51 @@ export class TerrainPreviewRenderer {
     const px=(index:number)=>field.bounds.minX+(index%field.width)/(field.width-1)*(field.bounds.maxX-field.bounds.minX);
     const pz=(index:number)=>field.bounds.minZ+Math.floor(index/field.width)/(field.height-1)*(field.bounds.maxZ-field.bounds.minZ);
     const py=(index:number)=>field.values[index]*1.18+0.014;
-    for(const index of rivers.channelIndices){
-      const next=rivers.downstream[index];if(next<0)continue;
-      const ax=px(index),az=pz(index),bx=px(next),bz=pz(next);
-      const dx=bx-ax,dz=bz-az,len=Math.hypot(dx,dz)||1;
-      const nx=-dz/len,nz=dx/len;
-      const wa=Math.max(rivers.width[index]*0.5,0.0015),wb=Math.max(rivers.width[next]*0.5,0.0015);
-      const aL=[ax+nx*wa,py(index),az+nz*wa],aR=[ax-nx*wa,py(index),az-nz*wa];
-      const bL=[bx+nx*wb,py(next),bz+nz*wb],bR=[bx-nx*wb,py(next),bz-nz*wb];
-      water.push(...aL,...aR,...bL,...aR,...bR,...bL);
+    const renderedSegments=new Set<string>();
+    const point=(index:number)=>({
+      x:px(index),z:pz(index),w:Math.max(rivers.width[index]*0.5,0.0015),
+    });
+    const catmull=(a:number,b:number,c:number,d:number,t:number):number=>{
+      const t2=t*t,t3=t2*t;
+      return 0.5*((2*b)+(-a+c)*t+(2*a-5*b+4*c-d)*t2+(-a+3*b-3*c+d)*t3);
+    };
+    // Trace each headwater once, then spline each D8 segment with its
+    // neighbouring cells as control points. This removes the staircase
+    // appearance while keeping the channel attached to the same heightfield.
+    for(const headwater of rivers.headwaterIndices){
+      const path=[headwater];
+      let current=headwater;
+      while(rivers.downstream[current]>=0 && path.length<=this.surfaceVertexCount){
+        current=rivers.downstream[current];
+        path.push(current);
+      }
+      for(let segment=0;segment<path.length-1;segment++){
+        const aIndex=path[segment],bIndex=path[segment+1];
+        const key=aIndex+":"+bIndex;
+        if(renderedSegments.has(key))continue;
+        renderedSegments.add(key);
+        const p0=point(path[Math.max(0,segment-1)]);
+        const p1=point(aIndex);
+        const p2=point(bIndex);
+        const p3=point(path[Math.min(path.length-1,segment+2)]);
+        const sections:{x:number;z:number;y:number;w:number}[]=[];
+        const subdivisions=4;
+        for(let step=0;step<=subdivisions;step++){
+          const t=step/subdivisions;
+          const x=catmull(p0.x,p1.x,p2.x,p3.x,t);
+          const z=catmull(p0.z,p1.z,p2.z,p3.z,t);
+          const width=Math.max(0.0012,catmull(p0.w,p1.w,p2.w,p3.w,t));
+          sections.push({x,z,y:sampleElevation(field,x,z)*1.18+0.012,w:width});
+        }
+        for(let step=0;step<subdivisions;step++){
+          const a=sections[step],b=sections[step+1];
+          const dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz)||1;
+          const nx=-dz/len,nz=dx/len;
+          const aL=[a.x+nx*a.w,a.y,a.z+nz*a.w],aR=[a.x-nx*a.w,a.y,a.z-nz*a.w];
+          const bL=[b.x+nx*b.w,b.y,b.z+nz*b.w],bR=[b.x-nx*b.w,b.y,b.z-nz*b.w];
+          water.push(...aL,...aR,...bL,...aR,...bR,...bL);
+        }
+      }
     }
     this.waterVertexCount=water.length/3;
     gl.bindBuffer(gl.ARRAY_BUFFER,this.waterBuffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(water),gl.DYNAMIC_DRAW);
