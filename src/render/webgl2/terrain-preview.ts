@@ -117,8 +117,10 @@ export class TerrainPreviewRenderer {
     gl.bindBuffer(gl.ARRAY_BUFFER,this.positionBuffer);gl.bufferData(gl.ARRAY_BUFFER,mesh.positions,gl.STATIC_DRAW);
     gl.bindBuffer(gl.ARRAY_BUFFER,this.normalBuffer);gl.bufferData(gl.ARRAY_BUFFER,mesh.normals,gl.STATIC_DRAW);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,this.indexBuffer);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,mesh.indices,gl.STATIC_DRAW);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,null);
+    // Upload the wireframe index buffer, then restore the triangle index buffer
+    // while this VAO is still bound. ELEMENT_ARRAY_BUFFER binding is VAO state.
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,this.lineBuffer);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,lines,gl.STATIC_DRAW);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,this.indexBuffer);
     gl.bindVertexArray(null);
     this.triangleCount=mesh.indices.length;this.lineCount=lines.length;
     this.render();
