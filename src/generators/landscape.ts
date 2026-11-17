@@ -5,6 +5,7 @@ export interface LandscapeOptions {
   scale: number;
   roughness: number;
   octaves: number;
+  mist: number;
 }
 
 const palettes = [
@@ -68,9 +69,24 @@ export function drawLandscape(
     context.fill();
   }
 
-  const haze = context.createLinearGradient(0, height * 0.48, 0, height);
+  const mistStrength = Math.max(0, Math.min(1, options.mist));
+  const haze = context.createLinearGradient(0, height * 0.42, 0, height);
   haze.addColorStop(0, "rgba(225, 226, 196, 0)");
-  haze.addColorStop(1, "rgba(225, 226, 196, 0.10)");
+  haze.addColorStop(0.58, "rgba(225, 226, 196, " + (0.025 + mistStrength * 0.12).toFixed(3) + ")");
+  haze.addColorStop(1, "rgba(225, 226, 196, " + (0.06 + mistStrength * 0.24).toFixed(3) + ")");
   context.fillStyle = haze;
-  context.fillRect(0, height * 0.48, width, height * 0.52);
+  context.fillRect(0, height * 0.42, width, height * 0.58);
+
+  if (mistStrength > 0.02) {
+    for (let band = 0; band < 3; band += 1) {
+      const y = height * (0.56 + band * 0.105);
+      const drift = Math.sin(options.seed * 0.013 + band * 2.1) * width * 0.035;
+      const fog = context.createLinearGradient(0, y - height * 0.055, 0, y + height * 0.055);
+      fog.addColorStop(0, "rgba(226, 232, 218, 0)");
+      fog.addColorStop(0.5, "rgba(226, 232, 218, " + (mistStrength * (0.055 - band * 0.008)).toFixed(3) + ")");
+      fog.addColorStop(1, "rgba(226, 232, 218, 0)");
+      context.fillStyle = fog;
+      context.fillRect(drift, y - height * 0.055, width, height * 0.11);
+    }
+  }
 }
