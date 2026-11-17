@@ -52,21 +52,31 @@ function updateOutputs(): void {
   document.querySelector("#detail-value")!.textContent = detailInput.value;
 }
 
-for (const input of [seedInput, scaleInput, roughnessInput, detailInput]) {
-  input.addEventListener("input", () => {
-    updateOutputs();
+let renderQueued = false;
+function scheduleRender(): void {
+  if (renderQueued) return;
+  renderQueued = true;
+  requestAnimationFrame(() => {
+    renderQueued = false;
     render();
   });
 }
 
-document.querySelector<HTMLButtonElement>("#regenerate")?.addEventListener("click", render);
+for (const input of [seedInput, scaleInput, roughnessInput, detailInput]) {
+  input.addEventListener("input", () => {
+    updateOutputs();
+    scheduleRender();
+  });
+}
+
+document.querySelector<HTMLButtonElement>("#regenerate")?.addEventListener("click", scheduleRender);
 document.querySelector<HTMLButtonElement>("#randomize")?.addEventListener("click", () => {
   seedInput.value = String(Math.floor(Math.random() * 1_000_000));
   updateOutputs();
-  render();
+  scheduleRender();
 });
 
-const observer = new ResizeObserver(render);
+const observer = new ResizeObserver(scheduleRender);
 observer.observe(canvas);
 updateOutputs();
-render();
+scheduleRender();
