@@ -1,4 +1,4 @@
-import { DEFAULT_TERRAIN_RECIPE, generateTerrain, type TerrainRecipe } from "./world";
+import { DEFAULT_TERRAIN_RECIPE, generateTerrain, buildDrainageField, extractRiverNetwork, type TerrainRecipe } from "./world";
 import { TerrainPreviewRenderer, type TerrainViewMode } from "./render/webgl2/terrain-preview";
 const canvas=document.querySelector<HTMLCanvasElement>("#terrain-canvas")!;
 const status=document.querySelector<HTMLElement>("#lab-status")!;
@@ -16,9 +16,17 @@ function updateLabels():void {
 function render():void {
   try {
     const generated=generateTerrain(recipe);renderer.setTerrain(generated.heightfield);
-    const mode=document.querySelector<HTMLSelectElement>("#debug-mode")!.value as TerrainViewMode;renderer.setMode(mode);renderer.resize();
+    const mode=document.querySelector<HTMLSelectElement>("#debug-mode")!.value as TerrainViewMode;renderer.setMode(mode);
     const d=generated.diagnostics;
-    metrics.innerHTML=`<span class="lab-chip">จุด ${generated.heightfield.values.length.toLocaleString("th-TH")}</span><span class="lab-chip">ต่ำสุด ${d.min.toFixed(3)}</span><span class="lab-chip">สูงสุด ${d.max.toFixed(3)}</span><span class="lab-chip">ความแปรปรวน ${d.variance.toFixed(4)}</span><span class="lab-chip">Slope เฉลี่ย ${d.slopeMean.toFixed(3)}</span>`;
+    let hydrologyMetrics="";
+    if(mode==="hydrology"){
+      const drainage=buildDrainageField(generated.heightfield);
+      const rivers=extractRiverNetwork(generated.heightfield,drainage);
+      renderer.setHydrology(drainage,rivers);
+      hydrologyMetrics=`<span class="lab-chip">ทางน้ำ ${rivers.diagnostics.channelCellCount.toLocaleString("th-TH")} จุด</span><span class="lab-chip">ต้นน้ำ ${rivers.diagnostics.headwaterCount.toLocaleString("th-TH")}</span><span class="lab-chip">ทางออก ${rivers.diagnostics.outletCount.toLocaleString("th-TH")}</span><span class="lab-chip">สะสมสูงสุด ${drainage.diagnostics.maximumAccumulation.toLocaleString("th-TH")}</span>`;
+    }
+    renderer.resize();
+    metrics.innerHTML=`<span class="lab-chip">จุด ${generated.heightfield.values.length.toLocaleString("th-TH")}</span><span class="lab-chip">ต่ำสุด ${d.min.toFixed(3)}</span><span class="lab-chip">สูงสุด ${d.max.toFixed(3)}</span><span class="lab-chip">ความแปรปรวน ${d.variance.toFixed(4)}</span><span class="lab-chip">Slope เฉลี่ย ${d.slopeMean.toFixed(3)}</span>${hydrologyMetrics}`;
     status.textContent="สร้างสำเร็จ · Seed "+recipe.seed;updateLabels();
   } catch(error) {status.textContent=error instanceof Error?error.message:"สร้างภูมิประเทศไม่สำเร็จ";}
 }
