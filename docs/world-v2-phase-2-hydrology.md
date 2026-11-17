@@ -35,13 +35,23 @@ This phase adds a renderer-independent hydrology field derived from the authorit
 - Every cell receives a valid outlet basin ID.
 - The source terrain buffer is unchanged.
 
+## River channel extraction
+
+`extractRiverNetwork(heightfield, drainage, options)` selects cells by a minimum contributing catchment area in world-space square units. The default threshold scales with cell area and grid size rather than using a fixed pixel count.
+
+- Every selected cell follows its D8 downstream edge to another selected cell, eventually reaching a boundary outlet.
+- Headwaters are selected cells with no selected upstream neighbour; junctions are naturally preserved by shared downstream cells.
+- Channel width is derived from contributing area with a bounded power relation and a maximum width in grid-cell units.
+- The result is a compact, renderer-independent graph: channel mask, channel indices, headwaters, outlets, downstream indices and per-cell widths.
+
 ## Deliberate limitations
 
 - D8 is the initial routing model; it can create angular or grid-biased channels.
 - Every boundary cell is currently an outlet. Later work may group outlets or use a sea-level mask.
-- No river threshold, channel graph, channel incision, water surface or visual debug overlay is included yet.
+- Channel extraction is threshold-based and D8 inherits grid-direction bias.
+- No channel incision, water surface or visual debug overlay is included yet.
 - Priority-Flood is drainage preprocessing, not a fluid simulation.
 
 ## Next
 
-Add scale-aware channel extraction from contributing area, connect channel cells into a directed river graph, then validate downhill continuity before any channel carving or water rendering.
+Next: validate the channel graph visually with a flow-accumulation/channel debug view. Only after review should channel incision and a water surface be implemented as separate derived stages.
