@@ -16,13 +16,17 @@ export interface TerrainLayer {
   readonly color: string;
   readonly frequency: number;
   readonly seed: number;
+  readonly depth: number;
   readonly surface: Float32Array;
+  readonly elevation: Float32Array;
 }
 
 export interface RiverPoint {
   readonly x: number;
   readonly y: number;
   readonly width: number;
+  readonly depth: number;
+  readonly flow: number;
 }
 
 export interface LandscapeWorld {
@@ -30,161 +34,244 @@ export interface LandscapeWorld {
   readonly height: number;
   readonly layers: readonly TerrainLayer[];
   readonly river: readonly RiverPoint[];
+  readonly fieldWidth: number;
+  readonly fieldHeight: number;
+  readonly elevation: Float32Array;
+  readonly moisture: Float32Array;
 }
 
 const layerSettings = [
-  { base: 0.58, amplitude: 0.13, color: "#597e78", frequency: 1.5, seed: 11 },
-  { base: 0.70, amplitude: 0.16, color: "#315e59", frequency: 2.2, seed: 37 },
-  { base: 0.84, amplitude: 0.13, color: "#183b3c", frequency: 3.1, seed: 83 },
+  { base: 0.38, amplitude: 0.15, color: "#597e78", frequency: 1.5, seed: 11, depth: 0.30 },
+  { base: 0.55, amplitude: 0.19, color: "#315e59", frequency: 2.2, seed: 37, depth: 0.55 },
+  { base: 0.72, amplitude: 0.22, color: "#183b3c", frequency: 3.1, seed: 83, depth: 0.79 },
 ] as const;
 
+const FIELD_WIDTH = 96;
+const FIELD_HEIGHT = 72;
+const DIRECTIONS = [
+  [-1, -1], [0, -1], [1, -1], [-1, 0],
+  [1, 0], [-1, 1], [0, 1], [1, 1],
+] as const;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function indexOf(x: number, z: number): number {
+  return z * FIELD_WIDTH + x;
+}
+
+function terrainElevation(x: number, z: number, options: LandscapeOptions): number {
+  const scale = Math.max(0.35, options.scale);
+  const roughness = clamp(options.roughness, 0, 1);
+  const broad = fbm2(x * scale * 2.7, z * scale * 2.4, options.seed + 1901, 4, 0.52, 2);
+  const detail = fbm2(x * scale * 8.5, z * scale * 7.2, options.seed + 2903, 3, 0.55, 2.05);
+  const warp = (fbm2(x * 2.1, z * 2.4, options.seed + 3907, 3, 0.5, 2) - 0.5) * 0.12;
+
+  // Three connected mountain ridges, not three independent silhouette layers.
+  const ridgeCenters = [0.19, 0.51, 0.82];
+  const ridgeStrength = [0.68, 0.88, 0.72];
+  let ridges = 0;
+  for (let ridge = 0; ridge < ridgeCenters.length; ridge += 1) {
+    const center = ridgeCenters[ridge] + Math.sin(z * (3.1 + ridge * 0.7) + ridge * 2.4) * (0.045 + roughness * 0.035) + warp;
+    const distance = (x - center) / (0.095 + roughness * 0.025);
+    const spine = Math.exp(-distance * distance * 1.45);
+    const peakNoise = 0.78 + 0.22 * fbm2(x * 9 + ridge * 17, z * 5, options.seed + ridge * 71, 3, 0.5, 2);
+    ridges = Math.max(ridges, spine * ridgeStrength[ridge] * peakNoise);
+  }
+
+  // Valleys remain broad and connected between the ridges.
+  const foothills = (broad - 0.5) * 0.17;
+  const crags = (Math.abs(detail * 2 - 1) - 0.35) * roughness * 0.12;
+  return clamp(0.12 + ridges * 0.62 + foothills + crags, 0.025, 1);
+}
+
+function buildHydrology(elevation: Float32Array): { parent: Int32Array; accumulation: Float32Array; order: number[] } {
+  const count = FIELD_WIDTH * FIELD_HEIGHT;
+  const filled = new Float32Array(elevation);
+  const visited = new Uint8Array(count);
+  const parent = new Int32Array(count);
+  parent.fill(-1);
+  const order: number[] = [];
+
+  // Priority-flood from the downstream edge fills closed depressions and
+  // records a drainage tree without requiring a costly fluid simulation.
+  const heap: { index: number; height: number }[] = [];
+  const push = (item: { index: number; height: number }): void => {
+    heap.push(item);
+    let child = heap.length - 1;
+    while (child > 0) {
+      const p = (child - 1) >> 1;
+      if (heap[p].height <= item.height) break;
+      heap[child] = heap[p];
+      child = p;
+    }
+    heap[child] = item;
+  };
+  const pop = (): { index: number; height: number } | undefined => {
+    if (!heap.length) return undefined;
+    const root = heap[0];
+    const last = heap.pop()!;
+    if (heap.length) {
+      let parentIndex = 0;
+      while (true) {
+        const left = parentIndex * 2 + 1;
+        const right = left + 1;
+        if (left >= heap.length) break;
+        const child = right < heap.length && heap[right].height < heap[left].height ? right : left;
+        if (heap[child].height >= last.height) break;
+        heap[parentIndex] = heap[child];
+        parentIndex = child;
+      }
+      heap[parentIndex] = last;
+    }
+    return root;
+  };
+
+  for (let x = 0; x < FIELD_WIDTH; x += 1) {
+    const index = indexOf(x, FIELD_HEIGHT - 1);
+    visited[index] = 1;
+    push({ index, height: filled[index] });
+  }
+
+  while (heap.length) {
+    const current = pop()!;
+    order.push(current.index);
+    const x = current.index % FIELD_WIDTH;
+    const z = Math.floor(current.index / FIELD_WIDTH);
+    for (const [dx, dz] of DIRECTIONS) {
+      const nx = x + dx;
+      const nz = z + dz;
+      if (nx < 0 || nx >= FIELD_WIDTH || nz < 0 || nz >= FIELD_HEIGHT) continue;
+      const next = indexOf(nx, nz);
+      if (visited[next]) continue;
+      visited[next] = 1;
+      parent[next] = current.index;
+      filled[next] = Math.max(filled[next], filled[current.index] + 0.00001);
+      push({ index: next, height: filled[next] });
+    }
+  }
+
+  const accumulation = new Float32Array(count);
+  accumulation.fill(1);
+  for (let i = order.length - 1; i >= 0; i -= 1) {
+    const index = order[i];
+    const downstream = parent[index];
+    if (downstream >= 0) accumulation[downstream] += accumulation[index];
+  }
+  return { parent, accumulation, order };
+}
+
+function projectPoint(x: number, z: number, elevation: number, width: number, height: number): { x: number; y: number } {
+  // Orthographic 2.5D projection: depth moves toward the viewer while
+  // elevation lifts terrain. A river therefore follows slopes, not a flat overlay.
+  return {
+    x: x * width,
+    y: height * (0.30 + z * 0.62 - elevation * 0.19),
+  };
+}
+
+function buildRiver(
+  elevation: Float32Array,
+  accumulation: Float32Array,
+  parent: Int32Array,
+  width: number,
+  height: number,
+  strength: number,
+): RiverPoint[] {
+  if (strength <= 0.01) return [];
+  let source = -1;
+  let sourceScore = -Infinity;
+  const maxAccumulation = Math.max(...Array.from(accumulation));
+  for (let z = 3; z < 18; z += 1) {
+    for (let x = 12; x < FIELD_WIDTH - 12; x += 1) {
+      const index = indexOf(x, z);
+      const score = accumulation[index] * 0.8 + elevation[index] * 90;
+      if (score > sourceScore) {
+        sourceScore = score;
+        source = index;
+      }
+    }
+  }
+  if (source < 0) return [];
+
+  const route: number[] = [];
+  const seen = new Uint8Array(FIELD_WIDTH * FIELD_HEIGHT);
+  let current = source;
+  while (current >= 0 && !seen[current] && route.length < FIELD_HEIGHT * 2) {
+    seen[current] = 1;
+    route.push(current);
+    if (Math.floor(current / FIELD_WIDTH) >= FIELD_HEIGHT - 1) break;
+    current = parent[current];
+  }
+  if (route.length < 8) return [];
+
+  return route.map((index) => {
+    const x = (index % FIELD_WIDTH) / (FIELD_WIDTH - 1);
+    const z = Math.floor(index / FIELD_WIDTH) / (FIELD_HEIGHT - 1);
+    const flow = accumulation[index] / maxAccumulation;
+    const point = projectPoint(x, z, elevation[index], width, height);
+    const perspective = 0.55 + z * 1.05;
+    const radius = width * (0.0012 + Math.pow(flow, 0.42) * 0.012) * perspective * strength;
+    return { ...point, width: radius, depth: z, flow };
+  });
+}
+
+/** Builds one shared elevation and drainage model for terrain, water and ecology. */
+export function createLandscapeWorld(width: number, height: number, options: LandscapeOptions): LandscapeWorld {
+  const elevation = new Float32Array(FIELD_WIDTH * FIELD_HEIGHT);
+  const moisture = new Float32Array(FIELD_WIDTH * FIELD_HEIGHT);
+  for (let z = 0; z < FIELD_HEIGHT; z += 1) {
+    for (let x = 0; x < FIELD_WIDTH; x += 1) {
+      const nx = x / (FIELD_WIDTH - 1);
+      const nz = z / (FIELD_HEIGHT - 1);
+      const index = indexOf(x, z);
+      elevation[index] = terrainElevation(nx, nz, options);
+      const humidity = fbm2(nx * 3.5, nz * 4.2, options.seed + 5101, 4, 0.55, 2);
+      moisture[index] = clamp(0.35 + humidity * 0.45 + (1 - elevation[index]) * 0.2, 0, 1);
+    }
+  }
+
+  const hydrology = buildHydrology(elevation);
+  const layers: TerrainLayer[] = layerSettings.map((settings) => {
+    const surface = new Float32Array(Math.min(420, Math.max(100, Math.round(width / 3))) + 1);
+    const layerElevation = new Float32Array(surface.length);
+    for (let sample = 0; sample < surface.length; sample += 1) {
+      const x = sample / (surface.length - 1);
+      const gridX = Math.round(x * (FIELD_WIDTH - 1));
+      const gridZ = Math.round(settings.depth * (FIELD_HEIGHT - 1));
+      const value = elevation[indexOf(gridX, gridZ)];
+      layerElevation[sample] = value;
+      surface[sample] = projectPoint(x, settings.depth, value, width, height).y / height;
+    }
+    return { ...settings, surface, elevation: layerElevation };
+  });
+
+  const river = buildRiver(elevation, hydrology.accumulation, hydrology.parent, width, height, clamp(options.water, 0, 1));
+  return {
+    width, height, layers, river,
+    fieldWidth: FIELD_WIDTH,
+    fieldHeight: FIELD_HEIGHT,
+    elevation,
+    moisture,
+  };
+}
+
+export function sampleWorldField(field: Float32Array, x: number, z: number): number {
+  const gx = clamp(x, 0, 1) * (FIELD_WIDTH - 1);
+  const gz = clamp(z, 0, 1) * (FIELD_HEIGHT - 1);
+  const x0 = Math.floor(gx), z0 = Math.floor(gz);
+  const x1 = Math.min(FIELD_WIDTH - 1, x0 + 1), z1 = Math.min(FIELD_HEIGHT - 1, z0 + 1);
+  const tx = gx - x0, tz = gz - z0;
+  const a = field[indexOf(x0, z0)] * (1 - tx) + field[indexOf(x1, z0)] * tx;
+  const b = field[indexOf(x0, z1)] * (1 - tx) + field[indexOf(x1, z1)] * tx;
+  return a * (1 - tz) + b * tz;
+}
+
 export function sampleSurface(layer: TerrainLayer, x: number, width: number): number {
-  const position = Math.max(0, Math.min(1, x / Math.max(1, width))) * (layer.surface.length - 1);
+  const position = clamp(x / Math.max(1, width), 0, 1) * (layer.surface.length - 1);
   const left = Math.floor(position);
   const right = Math.min(layer.surface.length - 1, left + 1);
   const blend = position - left;
   return layer.surface[left] * (1 - blend) + layer.surface[right] * blend;
-}
-
-function buildRiverRoute(options: LandscapeOptions): number[] {
-  // A compact 2D elevation field. The route is solved from fixed endpoints,
-  // rather than re-selecting a local valley independently at every sample.
-  const columns = 80;
-  const rows = 68;
-  const maxStep = 3;
-  const span = maxStep * 2 + 1;
-  const heightField = new Float32Array(columns * rows);
-  const terrainScale = Math.max(0.25, options.scale);
-  const roughness = Math.max(0, Math.min(1, options.roughness));
-
-  for (let row = 0; row < rows; row += 1) {
-    for (let column = 0; column < columns; column += 1) {
-      const x = column / (columns - 1);
-      const z = row / (rows - 1);
-      const broad = fbm2(x * terrainScale * 2.8, z * terrainScale * 2.1, options.seed + 1901, 4, 0.52, 2);
-      const detail = fbm2(x * terrainScale * 7.5, z * terrainScale * 6.2, options.seed + 2903, 3, 0.55 + roughness * 0.12, 2.05);
-      const ridge = Math.abs(detail * 2 - 1);
-      heightField[row * columns + column] = broad * 0.78 + ridge * roughness * 0.22;
-    }
-  }
-
-  // Endpoints depend only on the seed, so small terrain edits do not move them.
-  const sourceX = 0.34 + fbm2(0.17, 0.83, options.seed + 3907, 2, 0.5, 2) * 0.32;
-  const outletX = Math.max(0.12, Math.min(0.88,
-    sourceX + (fbm2(0.73, 0.29, options.seed + 4909, 2, 0.5, 2) - 0.5) * 0.24));
-  const start = Math.round(sourceX * (columns - 1));
-  const end = Math.round(outletX * (columns - 1));
-
-  const stateCount = columns * span;
-  let previous = new Float64Array(stateCount).fill(Number.POSITIVE_INFINITY);
-  const backDirections = new Int8Array(rows * stateCount);
-  backDirections.fill(127);
-  previous[start * span + maxStep] = heightField[start] * 2.4;
-
-  for (let row = 1; row < rows; row += 1) {
-    const current = new Float64Array(stateCount).fill(Number.POSITIVE_INFINITY);
-    for (let column = 0; column < columns; column += 1) {
-      for (let previousStep = -maxStep; previousStep <= maxStep; previousStep += 1) {
-        const previousIndex = column * span + previousStep + maxStep;
-        const baseCost = previous[previousIndex];
-        if (!Number.isFinite(baseCost)) continue;
-        for (let step = -maxStep; step <= maxStep; step += 1) {
-          const nextColumn = column + step;
-          if (nextColumn < 0 || nextColumn >= columns) continue;
-          if (row === rows - 1 && nextColumn !== end) continue;
-          const curvature = step - previousStep;
-          const cost = baseCost
-            + heightField[row * columns + nextColumn] * 2.4
-            + step * step * 0.055
-            + curvature * curvature * 0.19;
-          const stateIndex = nextColumn * span + step + maxStep;
-          if (cost < current[stateIndex]) {
-            current[stateIndex] = cost;
-            backDirections[row * stateCount + stateIndex] = previousStep;
-          }
-        }
-      }
-    }
-    previous = current;
-  }
-
-  let bestState = -1;
-  let bestCost = Number.POSITIVE_INFINITY;
-  for (let step = -maxStep; step <= maxStep; step += 1) {
-    const stateIndex = end * span + step + maxStep;
-    if (previous[stateIndex] < bestCost) {
-      bestCost = previous[stateIndex];
-      bestState = stateIndex;
-    }
-  }
-  if (bestState < 0 || !Number.isFinite(bestCost)) {
-    return Array.from({ length: rows }, (_, row) => start + (end - start) * row / (rows - 1));
-  }
-
-  const route = new Array<number>(rows);
-  let column = end;
-  let step = bestState % span - maxStep;
-  route[rows - 1] = column;
-  for (let row = rows - 1; row > 0; row -= 1) {
-    const stateIndex = column * span + step + maxStep;
-    const previousStep = backDirections[row * stateCount + stateIndex];
-    const previousColumn = column - step;
-    route[row - 1] = previousColumn;
-    column = previousColumn;
-    step = previousStep === 127 ? 0 : previousStep;
-  }
-
-  // Two light smoothing passes remove grid-like bends while preserving anchors.
-  for (let pass = 0; pass < 2; pass += 1) {
-    const smoothed = route.slice();
-    for (let row = 2; row < rows - 2; row += 1) {
-      smoothed[row] = route[row - 2] * 0.08 + route[row - 1] * 0.22
-        + route[row] * 0.40 + route[row + 1] * 0.22 + route[row + 2] * 0.08;
-    }
-    for (let row = 1; row < rows - 1; row += 1) route[row] = smoothed[row];
-  }
-  return route;
-}
-
-/** Builds shared terrain profiles and a deterministic river path over a 2D elevation field. */
-export function createLandscapeWorld(width: number, height: number, options: LandscapeOptions): LandscapeWorld {
-  const samples = Math.min(420, Math.max(100, Math.round(width / 3)));
-  const layers: TerrainLayer[] = layerSettings.map((settings) => {
-    const surface = new Float32Array(samples + 1);
-    for (let index = 0; index <= samples; index += 1) {
-      const nx = (index / samples) * options.scale * settings.frequency;
-      const broad = fbm2(nx * 3, settings.seed, options.seed + settings.seed, options.octaves, 0.52, 2);
-      const fine = fbm2(nx * 11, settings.seed * 0.17, options.seed + settings.seed * 3, options.octaves, options.roughness, 2.1);
-      const ridge = Math.abs(fine * 2 - 1);
-      const displacement = (broad - 0.5) * 0.72 + (ridge - 0.5) * options.roughness * 0.28;
-      surface[index] = settings.base + displacement * settings.amplitude;
-    }
-    return { ...settings, surface };
-  });
-
-  const riverStrength = Math.max(0, Math.min(1, options.water));
-  const river: RiverPoint[] = [];
-  if (riverStrength > 0.01) {
-    const route = buildRiverRoute(options);
-    const count = 72;
-    for (let index = 0; index <= count; index += 1) {
-      const t = index / count;
-      const position = t * (route.length - 1);
-      const left = Math.floor(position);
-      const right = Math.min(route.length - 1, left + 1);
-      const blend = position - left;
-      const column = route[left] * (1 - blend) + route[right] * blend;
-      const perspective = Math.pow(t, 1.18);
-      // Water is a global scale control; perspective is applied separately.
-      const baseWidth = width * (0.0025 + 0.092 * perspective);
-      const riverWidth = baseWidth * riverStrength;
-      river.push({
-        x: (column / 79) * width,
-        y: height * (0.46 + t * 0.62),
-        width: riverWidth,
-      });
-    }
-  }
-
-  return { width, height, layers, river };
 }
