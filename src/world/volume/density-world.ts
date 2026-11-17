@@ -10,9 +10,10 @@ export interface DensityVolume {
   readonly voxelSize:{readonly x:number;readonly y:number;readonly z:number};
   readonly values:Float32Array;
 }
+export interface VolumeMeshChunk {readonly startIndex:number;readonly indexCount:number;readonly centerX:number;readonly centerZ:number}
 export interface VolumeMesh {
   readonly positions:Float32Array;readonly normals:Float32Array;readonly indices:Uint32Array;
-  readonly vertexCount:number;readonly triangleCount:number;
+  readonly vertexCount:number;readonly triangleCount:number;readonly chunks:readonly VolumeMeshChunk[];
 }
 export interface DensityWorld {
   readonly heightfield:Heightfield;readonly volume:DensityVolume;readonly mesh:VolumeMesh;
