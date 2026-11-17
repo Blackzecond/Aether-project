@@ -265,7 +265,9 @@ function renderGraphEditor(): void {
       for (const output of definition.outputs) {
         const value = nodeValues?.[output];
         const display = typeof value === "number" ? Number(value.toPrecision(4)).toString() : String(value ?? "—");
-        resultValues.append(createElement("span", "node-result-chip", output + ": " + display));
+        const chip = createElement("span", "node-result-chip", output + ": " + display);
+        chip.dataset.resultNodeId = node.id; chip.dataset.resultPort = output;
+        resultValues.append(chip);
       }
       resultPanel.append(resultValues); card.append(resultPanel); graphStage.append(card);
     });
@@ -296,13 +298,25 @@ function render(): void {
   resolutionLabel.textContent = `${size.width} × ${size.height} PX`;
 }
 
+function updateNodeResultDisplays(): void {
+  const values = evaluateGraph(graphState, registry).values;
+  const chips = graphStage.querySelectorAll<HTMLElement>("[data-result-node-id][data-result-port]");
+  for (const chip of Array.from(chips)) {
+    const nodeId = chip.dataset.resultNodeId, port = chip.dataset.resultPort;
+    if (!nodeId || !port) continue;
+    const value = values.get(nodeId)?.[port];
+    const display = typeof value === "number" ? Number(value.toPrecision(4)).toString() : String(value ?? "—");
+    chip.textContent = port + ": " + display;
+  }
+}
+
 let previewRenderQueued = false;
 function schedulePreviewRender(): void {
   if (previewRenderQueued) return;
   previewRenderQueued = true;
   requestAnimationFrame(() => {
     previewRenderQueued = false;
-    try { updateOutputs(); render(); }
+    try { updateNodeResultDisplays(); updateOutputs(); render(); }
     catch (error) { renderStatus.textContent = "เกิดข้อผิดพลาด"; graphStatus.textContent = error instanceof Error ? error.message : "Graph ทำงานไม่สำเร็จ"; console.error(error); }
   });
 }
