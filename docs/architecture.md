@@ -59,12 +59,13 @@ Future graph types should explicitly distinguish scalar, vector, color, curve, g
 
 ## Shared landscape world model
 
-The first landscape generator now evaluates a single deterministic world model before drawing any environment elements.
+The Canvas landscape currently uses a lightweight 2.5D renderer with layered terrain profiles. River routing is a separate, bounded 2D elevation-field calculation shared by the world-generation pass.
 
-- Terrain profiles are sampled once per depth layer and reused by terrain rendering, vegetation placement, and river routing.
-- The river route is anchored to a low valley in the middle terrain profile, then searches nearby low corridors in the foreground profile as it approaches the viewer.
-- River width grows with normalized depth to create perspective; its channel banks and highlights follow the same centerline.
-- Trees are grounded against the terrain profile for their layer and are kept clear of the river channel.
-- Changing terrain scale, roughness, detail, or seed regenerates the shared profiles, so dependent elements change with the terrain rather than remaining independent overlays.
+- Terrain profiles are sampled once and reused by terrain rendering and vegetation placement.
+- River routing builds a compact seeded 2D elevation field, then solves a constrained path between seed-stable endpoints.
+- The route cost combines sampled elevation, lateral movement, and change in direction. This favors lower terrain while discouraging long detours and sharp turns.
+- A short smoothing pass reduces grid-like bends. River width is controlled globally, while perspective widening is applied independently.
+- The channel is rendered as overlapping round line segments instead of offset left/right polygons, avoiding the self-intersections that caused spikes.
+- The route is deterministic for a given seed and responds to terrain scale and roughness. Its endpoints remain fixed for that seed.
 
-This is an intentionally lightweight 2.5D height-profile model for the Canvas preview. It establishes shared data contracts before moving to a full 2D height field, terrain masks, occlusion, and more physically grounded water flow.
+This is a stable path-planning approximation, not full hydrology: it does not yet calculate water accumulation, drainage basins, erosion, or true 3D occlusion. Those require a shared 2D terrain height field used by all world elements, followed by flow accumulation and depth-aware rendering.
