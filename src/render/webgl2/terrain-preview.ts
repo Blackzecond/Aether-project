@@ -185,9 +185,12 @@ function buildGroundCoverGeometry(): Float32Array {
     nx/=len;ny/=len;nz/=len;
     for(const p of [a,b,d])out.push(p[0],p[1],p[2],nx,ny,nz,kind);
   };
-  for(let i=0;i<5;i++){
-    const angle=i/5*Math.PI*2,dx=Math.cos(angle),dz=Math.sin(angle),sx=-dz*0.10,sz=dx*0.10;
-    tri([-sx,0,-sz],[sx,0,sz],[dx*0.16,0.95,dz*0.16],0);
+  for(let i=0;i<9;i++){
+    const angle=i/9*Math.PI*2,dx=Math.cos(angle),dz=Math.sin(angle),px=-dz,pz=dx;
+    const width=0.055+(i%3)*0.012,height=0.62+(i%4)*0.10;
+    const baseL=[-px*width,0,-pz*width],baseR=[px*width,0,pz*width];
+    const mid=[dx*0.10,height*0.52,dz*0.10],tip=[dx*(0.18+(i%2)*0.04),height,dz*(0.18+(i%2)*0.04)];
+    tri(baseL,baseR,mid,0);tri(baseR,tip,mid,0);
   }
   for(let i=0;i<4;i++){
     const angle=i/4*Math.PI*2,dx=Math.cos(angle),dz=Math.sin(angle),px=-dz,pz=dx;
