@@ -17,7 +17,9 @@ export function buildHeightfieldMesh(field: Heightfield, verticalScale = 1): Ter
   for (let x = width - 2; x >= 0; x -= 1) perimeter.push((height - 1) * width + x);
   for (let z = height - 2; z > 0; z -= 1) perimeter.push(z * width);
 
-  const baseY = Math.min(0, Math.min(...values) * verticalScale - 0.012);
+  let minimumHeight = Infinity;
+  for (let i = 0; i < values.length; i += 1) minimumHeight = Math.min(minimumHeight, values[i]);
+  const baseY = Math.min(0, minimumHeight * verticalScale - 0.012);
   const wallStart = surfaceCount;
   const bottomStart = wallStart + perimeter.length * 2;
   const bottomCenter = bottomStart;
