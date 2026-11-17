@@ -12,7 +12,8 @@ scope.onmessage=(event:MessageEvent<Request>):void=>{
   const {id,recipe,resolution}=event.data;
   void (async()=>{
     try{
-      const world=await generateDensityWorldGpu(recipe,resolution)??generateDensityWorld(recipe,resolution);
+      const gpuWorld=await generateDensityWorldGpu(recipe,resolution);
+      const world=gpuWorld??generateDensityWorld(recipe,resolution);
       const heightfield=world.heightfield,mesh=world.mesh;
       const response={
         id,ok:true as const,
@@ -25,7 +26,7 @@ scope.onmessage=(event:MessageEvent<Request>):void=>{
             vertexCount:lod.vertexCount,triangleCount:lod.triangleCount,chunks:lod.chunks,
           })),
         },
-        diagnostics:world.diagnostics,
+        diagnostics:world.diagnostics,backend:gpuWorld?"webgpu" as const:"cpu" as const,
       };
       const transfers:Transferable[]=[heightfield.values.buffer,mesh.positions.buffer,mesh.normals.buffer,mesh.indices.buffer];
       for(const lod of mesh.lods.slice(1))transfers.push(lod.positions.buffer,lod.normals.buffer,lod.indices.buffer);
