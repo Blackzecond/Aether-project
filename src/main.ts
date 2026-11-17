@@ -168,7 +168,8 @@ wireLayer.classList.add("graph-wires");
 wireLayer.setAttribute("aria-hidden", "true");
 graphStage.append(wireLayer); graphViewport.append(graphStage);
 let viewX = 0, viewY = 0, viewScale = 0.6;
-let gesture: { kind: "pan" | "node"; pointerId: number; sx: number; sy: number; ox: number; oy: number; id?: string } | null = null;
+let gesture: { kind: "pan" | "node" | "wire"; pointerId: number; sx: number; sy: number; ox: number; oy: number; id?: string; fromNodeId?: string; fromPort?: string } | null = null;
+let suppressGraphClick = false;
 function nodePosition(id: string, index: number) { return graphState.layout?.[id] ?? { x: 60 + (index % 3) * 340, y: 60 + Math.floor(index / 3) * 250 }; }
 function drawGraphWires(): void {
   wireLayer.setAttribute("viewBox", "0 0 1500 1200"); wireLayer.setAttribute("width", "1500"); wireLayer.setAttribute("height", "1200"); wireLayer.replaceChildren();
@@ -275,6 +276,7 @@ for (const input of [seedInput, scaleInput, roughnessInput, detailInput]) {
 }
 
 graphStage.addEventListener("click", (event) => {
+  if (suppressGraphClick) { suppressGraphClick = false; return; }
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
   const button = target.closest<HTMLButtonElement>("button[data-action]");
@@ -454,7 +456,17 @@ requiredElement<HTMLButtonElement>("#randomize").addEventListener("click", () =>
 });
 
 graphViewport.addEventListener("pointerdown", (event) => {
-  const target = event.target as HTMLElement, card = target.closest<HTMLElement>(".editor-node"), handle = target.closest<HTMLElement>(".node-drag-handle");
+  const target = event.target as HTMLElement;
+  const outputPort = target.closest<HTMLButtonElement>('button[data-action="select-output"]');
+  if (outputPort?.dataset.nodeId && outputPort.dataset.port) {
+    const rect = outputPort.getBoundingClientRect(), stageRect = graphStage.getBoundingClientRect();
+    gesture = { kind: "wire", pointerId: event.pointerId, sx: event.clientX, sy: event.clientY,
+      ox: (rect.left + rect.width / 2 - stageRect.left) / viewScale,
+      oy: (rect.top + rect.height / 2 - stageRect.top) / viewScale,
+      fromNodeId: outputPort.dataset.nodeId, fromPort: outputPort.dataset.port };
+    graphViewport.setPointerCapture(event.pointerId); event.preventDefault(); return;
+  }
+  const card = target.closest<HTMLElement>(".editor-node"), handle = target.closest<HTMLElement>(".node-drag-handle");
   if (card && handle && !target.closest("button,input,select")) {
     const id = card.dataset.nodeId; if (!id) return; const pos = nodePosition(id, graphState.nodes.findIndex(n => n.id === id));
     gesture = { kind: "node", pointerId: event.pointerId, sx: event.clientX, sy: event.clientY, ox: pos.x, oy: pos.y, id };
@@ -467,12 +479,45 @@ graphViewport.addEventListener("pointerdown", (event) => {
 graphViewport.addEventListener("pointermove", (event) => {
   if (!gesture || gesture.pointerId !== event.pointerId) return; const dx = event.clientX - gesture.sx, dy = event.clientY - gesture.sy;
   if (gesture.kind === "pan") { viewX = gesture.ox + dx; viewY = gesture.oy + dy; applyGraphView(); }
+  else if (gesture.kind === "wire") {
+    drawGraphWires();
+    const rect = graphStage.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / viewScale, y = (event.clientY - rect.top) / viewScale;
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    const bend = Math.max(55, Math.abs(x - gesture.ox) * 0.4);
+    path.setAttribute("d", "M " + gesture.ox + " " + gesture.oy + " C " + (gesture.ox + bend) + " " + gesture.oy + ", " + (x - bend) + " " + y + ", " + x + " " + y);
+    path.setAttribute("class", "graph-wire graph-wire-preview"); wireLayer.append(path);
+  }
   else if (gesture.id) { const x = Math.max(0, Math.min(10000, gesture.ox + dx / viewScale)), y = Math.max(0, Math.min(10000, gesture.oy + dy / viewScale));
     graphState = { ...graphState, layout: { ...graphState.layout, [gesture.id]: { x, y } } }; const node = graphStage.querySelector<HTMLElement>('[data-node-id="' + CSS.escape(gesture.id) + '"]');
     if (node) { node.style.left = x + "px"; node.style.top = y + "px"; } drawGraphWires();
   }
 });
-function endGraphGesture(event: PointerEvent): void { if (!gesture || gesture.pointerId !== event.pointerId) return; if (gesture.kind === "node") { graphStage.querySelector(".is-dragging")?.classList.remove("is-dragging"); saveGraph(); } gesture = null; }
+function endGraphGesture(event: PointerEvent): void {
+  if (!gesture || gesture.pointerId !== event.pointerId) return;
+  if (gesture.kind === "node") { graphStage.querySelector(".is-dragging")?.classList.remove("is-dragging"); saveGraph(); }
+  else if (gesture.kind === "wire") {
+    const fromNodeId = gesture.fromNodeId, fromPort = gesture.fromPort;
+    const hit = document.elementFromPoint(event.clientX, event.clientY);
+    const input = hit instanceof Element ? hit.closest<HTMLButtonElement>('button[data-action="connect-input"]') : null;
+    suppressGraphClick = true;
+    if (fromNodeId && fromPort && input?.dataset.nodeId && input.dataset.port) {
+      const toNodeId = input.dataset.nodeId, toPort = input.dataset.port;
+      if (fromNodeId === toNodeId) graphStatus.textContent = "ไม่สามารถเชื่อม Node เข้าหาตัวเองได้";
+      else {
+        const edgeId = (() => { let candidate = "edge-" + edgeCounter++; while (graphState.edges.some(item => item.id === candidate)) candidate = "edge-" + edgeCounter++; return candidate; })();
+        const edge = { id: edgeId, fromNodeId, fromPort, toNodeId, toPort };
+        const candidate: GraphDocument = { ...graphState, edges: [...graphState.edges.filter(item => !(item.toNodeId === toNodeId && item.toPort === toPort)), edge] };
+        try { evaluateGraph(candidate, registry); graphState = candidate; saveGraph(); graphStatus.textContent = "เชื่อมต่อแล้ว"; scheduleRender(); }
+        catch (error) { graphStatus.textContent = error instanceof Error ? error.message : "การเชื่อมต่อนี้ใช้ไม่ได้"; renderGraphEditor(); }
+      }
+    } else {
+      selectedOutput = fromNodeId && fromPort ? { nodeId: fromNodeId, port: fromPort } : null;
+      graphStatus.textContent = "เลือกช่องส่งแล้ว แตะช่องรับหรือเชื่อมด้วยการลากสาย"; renderGraphEditor();
+    }
+  }
+  gesture = null;
+}
 graphViewport.addEventListener("pointerup", endGraphGesture); graphViewport.addEventListener("pointercancel", endGraphGesture);
 graphViewport.addEventListener("wheel", (event) => { event.preventDefault(); const r = graphViewport.getBoundingClientRect(), px = event.clientX-r.left, py = event.clientY-r.top;
   const next = Math.max(0.35, Math.min(1.5, viewScale * (event.deltaY < 0 ? 1.08 : 0.92))), ratio = next/viewScale;
