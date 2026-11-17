@@ -103,7 +103,17 @@ export function generateTerrain(recipe: TerrainRecipe): TerrainGeneration {
       const elevation = 0.025
         + (mountainBody + foothills) * landform.relief
         + detail * landform.roughness;
-      const value = Math.fround(clamp(elevation, 0, 1.5));
+      // Fade the outer 13% of the world into a low plain so the terrain
+      // joins the surrounding ground instead of ending as a raised island.
+      const edgeDistance = Math.min(
+        ix / (width - 1),
+        iz / (height - 1),
+        (width - 1 - ix) / (width - 1),
+        (height - 1 - iz) / (height - 1),
+      );
+      const edgeFade = smoothstep(0, 0.13, edgeDistance);
+      const groundedElevation = 0.01 + Math.max(0, elevation - 0.01) * edgeFade;
+      const value = Math.fround(clamp(groundedElevation, 0, 1.5));
       values[iz * width + ix] = value;
       min = Math.min(min, value);
       max = Math.max(max, value);
