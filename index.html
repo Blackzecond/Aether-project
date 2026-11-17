@@ -64,7 +64,7 @@
             <span><span class="eyebrow">ระบบเบื้องหลัง</span><strong>Node Graph</strong></span>
             <span class="summary-meta"><span id="graph-count">4 NODES · 3 LINKS</span> <span class="chevron">⌄</span></span>
           </summary>
-          <p class="graph-description">ลากหัว Node เพื่อจัดตำแหน่ง · ลากจาก OUTPUT ไป INPUT เพื่อเชื่อมสาย · ลากพื้นที่ว่างเพื่อเลื่อนมุมมอง</p>
+          <p class="graph-description">Node คือชุดคำสั่งที่ส่งค่าต่อกันไปยัง Landscape Generator เช่น Number → Math → Output ค่าที่ส่งออกจะแสดงใต้ Node และภาพตัวอย่างจะอัปเดตทันทีเมื่อแก้ตัวเลข</p>
           <div class="graph-file-toolbar">
             <button id="export-graph" class="quiet-button" type="button">ส่งออก JSON ↓</button>
             <button id="import-graph" class="quiet-button" type="button">นำเข้า JSON ↑</button>
@@ -91,7 +91,8 @@
           <p id="graph-filter-count" class="graph-filter-count">แสดง Node ทั้งหมด</p>
           <div class="graph-view-toolbar">
             <button id="graph-zoom-out" class="quiet-button" type="button" aria-label="ซูมออก">−</button>
-            <button id="graph-zoom-reset" class="quiet-button" type="button">รีเซ็ตมุมมอง</button>
+            <button id="graph-fit" class="quiet-button" type="button">จัดให้เห็นทั้งหมด</button>
+            <button id="graph-zoom-reset" class="quiet-button" type="button">รีเซ็ต</button>
             <button id="graph-zoom-in" class="quiet-button" type="button" aria-label="ซูมเข้า">+</button>
           </div>
           <p id="graph-status" class="graph-status" role="status">พร้อมใช้งาน · บันทึก Graph ในเครื่องอัตโนมัติ</p>
