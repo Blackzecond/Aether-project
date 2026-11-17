@@ -115,7 +115,7 @@ export function generateDensityWorld(recipe:TerrainRecipe,resolution:DensityReso
     let top=0;
     for(let y=height-2;y>=0;y--){
       const upper=values[index(x,y+1,z)],lower=values[index(x,y,z)];
-      if(upper>0&&lower<=0){const t=upper/(upper-lower);top=origin.y+((y+1)-t)*voxelSize.y;break;}
+      if(upper<=0&&lower>0){const t=lower/(lower-upper);top=origin.y+(y+t)*voxelSize.y;break;}
     }
     heightValues[z*width+x]=top;
   }
