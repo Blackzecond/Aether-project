@@ -103,7 +103,7 @@ export function generateDensityWorld(recipe:TerrainRecipe,resolution:DensityReso
         const erosion=(0.0045*(0.5-cellular)+0.0018*(0.5-fineCell)+broadNoise*0.004)*rockMask;
         let density=baseHeight-wy+erosion;
         for(const rock of rocks)density=smoothMax(density,ellipsoidDensity(wx,wy,wz,rock),rock.blend);
-        for(const cave of caves)density=smoothMin(density,-capsuleDistance(wx,wy,wz,cave),0.018);
+        for(const cave of caves)density=smoothMin(density,capsuleDistance(wx,wy,wz,cave),0.018);
         if(x===0||z===0||x===width-1||z===depth-1||y===0||y===height-1)density=-0.08;
         const value=Math.fround(density);values[index(x,y,z)]=value;if(value>0)occupiedSamples++;
       }
@@ -161,14 +161,18 @@ export function buildSurfaceNets(volume:DensityVolume):VolumeMesh{
   }
   const pos=new Float32Array(positions),normals=new Float32Array(pos.length);
   const sample=(x:number,y:number,z:number):number=>{
-    const ix=clamp(Math.round(x),0,nx-1),iy=clamp(Math.round(y),0,ny-1),iz=clamp(Math.round(z),0,nz-1);
-    return D[ix+nx*(iy+ny*iz)];
+    const px=clamp(x,0,nx-1.001),py=clamp(y,0,ny-1.001),pz=clamp(z,0,nz-1.001);
+    const ix=Math.floor(px),iy=Math.floor(py),iz=Math.floor(pz),fx=px-ix,fy=py-iy,fz=pz-iz;
+    const at=(xx:number,yy:number,zz:number)=>D[xx+nx*(yy+ny*zz)];
+    const a=mix(mix(at(ix,iy,iz),at(ix+1,iy,iz),fx),mix(at(ix,iy+1,iz),at(ix+1,iy+1,iz),fx),fy);
+    const b=mix(mix(at(ix,iy,iz+1),at(ix+1,iy,iz+1),fx),mix(at(ix,iy+1,iz+1),at(ix+1,iy+1,iz+1),fx),fy);
+    return mix(a,b,fz);
   };
   for(let i=0;i<pos.length;i+=3){
     const gx=(pos[i]-origin.x)/voxelSize.x,gy=(pos[i+1]-origin.y)/voxelSize.y,gz=(pos[i+2]-origin.z)/voxelSize.z;
-    const dx=(sample(gx-1,gy,gz)-sample(gx+1,gy,gz))/voxelSize.x;
-    const dy=(sample(gx,gy-1,gz)-sample(gx,gy+1,gz))/voxelSize.y;
-    const dz=(sample(gx,gy,gz-1)-sample(gx,gy,gz+1))/voxelSize.z,length=Math.hypot(dx,dy,dz)||1;
+    const dx=(sample(gx-0.5,gy,gz)-sample(gx+0.5,gy,gz))/voxelSize.x;
+    const dy=(sample(gx,gy-0.5,gz)-sample(gx,gy+0.5,gz))/voxelSize.y;
+    const dz=(sample(gx,gy,gz-0.5)-sample(gx,gy,gz+0.5))/voxelSize.z,length=Math.hypot(dx,dy,dz)||1;
     normals[i]=dx/length;normals[i+1]=dy/length;normals[i+2]=dz/length;
   }
   return{positions:pos,normals,indices:new Uint32Array(indices),vertexCount:pos.length/3,triangleCount:indices.length/3};
