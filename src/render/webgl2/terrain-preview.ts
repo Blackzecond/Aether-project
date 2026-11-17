@@ -244,6 +244,7 @@ export class TerrainPreviewRenderer {
   private readonly treeMvpLocation: WebGLUniformLocation;
   private treeVertexCount = 0;
   private treeCount = 0;
+  private renderRequest = 0;
   private waterVertexCount = 0;
   private maximumAccumulation = 1;
   private vertexCount = 0;
@@ -374,7 +375,7 @@ export class TerrainPreviewRenderer {
         this.azimuth -= dx * 0.008;
         this.elevation = Math.max(0.16, Math.min(1.32, this.elevation + dy * 0.006));
       }
-      this.render();
+      this.scheduleRender();
     });
     const release = (event: PointerEvent): void => {
       this.pointers.delete(event.pointerId);
@@ -386,8 +387,16 @@ export class TerrainPreviewRenderer {
     this.canvas.addEventListener("wheel", event => {
       event.preventDefault();
       this.distance = Math.max(this.fitDistance * 0.28, Math.min(this.fitDistance * 2.2, this.distance * Math.exp(event.deltaY * 0.001)));
-      this.render();
+      this.scheduleRender();
     }, { passive: false });
+  }
+
+  private scheduleRender(): void {
+    if (this.renderRequest) return;
+    this.renderRequest = window.requestAnimationFrame(() => {
+      this.renderRequest = 0;
+      this.render();
+    });
   }
 
   private pinchDistance(): number {
@@ -404,7 +413,7 @@ export class TerrainPreviewRenderer {
     this.azimuth = 0.76;
     this.elevation = 0.24;
     this.distance = this.fitDistance * 0.46;
-    this.render();
+    this.scheduleRender();
   }
 
   setMode(mode: TerrainViewMode): void {
@@ -422,9 +431,9 @@ export class TerrainPreviewRenderer {
     this.render();
   }
 
-  movePlayer(forward: number, right: number): void {
+  movePlayer(forward: number, right: number, deltaSeconds = 0.1): void {
     if (this.mode !== "first-person" || !this.field) return;
-    const speed = 0.0007;
+    const speed = 0.014 * Math.max(0, Math.min(deltaSeconds, 0.05));
     const sin = Math.sin(this.playerYaw), cos = Math.cos(this.playerYaw);
     const dx = (-sin * forward + cos * right) * speed;
     const dz = (-cos * forward - sin * right) * speed;
@@ -433,7 +442,7 @@ export class TerrainPreviewRenderer {
     const z = Math.max(b.minZ + 0.008, Math.min(b.maxZ - 0.008, this.playerZ + dz));
     this.playerX = x;
     this.playerZ = z;
-    this.render();
+    this.scheduleRender();
   }
 
   setVegetation(instances: readonly VegetationInstance[]): void {
@@ -630,6 +639,7 @@ export class TerrainPreviewRenderer {
     gl.deleteVertexArray(this.vao);
     gl.deleteProgram(this.program);
     gl.deleteBuffer(this.waterBuffer);gl.deleteVertexArray(this.waterVao);gl.deleteProgram(this.waterProgram);
+    if (this.renderRequest) window.cancelAnimationFrame(this.renderRequest);
     gl.deleteBuffer(this.treeGeometryBuffer);gl.deleteBuffer(this.treeInstanceBuffer);gl.deleteVertexArray(this.treeVao);gl.deleteProgram(this.treeProgram);
   }
 }
