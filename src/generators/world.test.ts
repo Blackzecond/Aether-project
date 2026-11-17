@@ -11,46 +11,52 @@ const baseOptions = {
   water: 0.7,
 };
 
-describe("shared landscape world", () => {
-  it("reproduces terrain and river paths for the same seed", () => {
+describe("shared terrain, hydrology and ecology", () => {
+  it("reproduces the complete world deterministically", () => {
     const first = createLandscapeWorld(640, 360, baseOptions);
     const second = createLandscapeWorld(640, 360, baseOptions);
-    expect(Array.from(first.layers[2].surface)).toEqual(Array.from(second.layers[2].surface));
+    expect(Array.from(first.elevation)).toEqual(Array.from(second.elevation));
+    expect(Array.from(first.moisture)).toEqual(Array.from(second.moisture));
     expect(first.river).toEqual(second.river);
+    expect(Array.from(first.layers[2].surface)).toEqual(Array.from(second.layers[2].surface));
   });
 
-  it("keeps river endpoints anchored when terrain parameters change", () => {
-    const calm = createLandscapeWorld(640, 360, baseOptions);
-    const rugged = createLandscapeWorld(640, 360, { ...baseOptions, roughness: 0.95, scale: 1.8 });
-    expect(calm.river[0].x).toBe(rugged.river[0].x);
-    expect(calm.river.at(-1)?.x).toBe(rugged.river.at(-1)?.x);
-    expect(calm.river[0].y).toBe(rugged.river[0].y);
-  });
-
-  it("keeps the river path continuous without abrupt lateral jumps", () => {
+  it("builds a real 2D elevation field with connected mountain and valley variation", () => {
     const world = createLandscapeWorld(640, 360, baseOptions);
-    const largestStep = Math.max(...world.river.slice(1).map((point, index) =>
-      Math.abs(point.x - world.river[index].x)));
-    expect(largestStep).toBeLessThan(640 * 0.075);
-    expect(world.river.every((point, index) => index === 0 || point.y > world.river[index - 1].y)).toBe(true);
+    expect(world.fieldWidth).toBeGreaterThan(32);
+    expect(world.fieldHeight).toBeGreaterThan(32);
+    expect(Math.max(...world.elevation)).toBeGreaterThan(Math.min(...world.elevation) + 0.2);
+    expect(world.layers[0].surface).not.toEqual(world.layers[1].surface);
+    expect(world.layers[1].surface).not.toEqual(world.layers[2].surface);
   });
 
-  it("scales the complete river width uniformly with the water control", () => {
+  it("routes the river from the upper landscape toward the downstream edge", () => {
+    const world = createLandscapeWorld(640, 360, baseOptions);
+    expect(world.river.length).toBeGreaterThan(8);
+    expect(world.river[0].depth).toBeLessThan(0.3);
+    expect(world.river.at(-1)!.depth).toBeGreaterThan(0.95);
+    expect(world.river.every((point) => point.y > 0 && point.y < 360 * 1.2)).toBe(true);
+    expect(world.river.every((point) => Number.isFinite(point.x) && Number.isFinite(point.y))).toBe(true);
+  });
+
+  it("uses terrain elevation and depth for river screen position", () => {
+    const world = createLandscapeWorld(640, 360, baseOptions);
+    const point = world.river[Math.floor(world.river.length * 0.4)];
+    const expectedY = 360 * (0.30 + point.depth * 0.62)
+      - 360 * world.elevation[Math.round(point.depth * (world.fieldHeight - 1)) * world.fieldWidth
+        + Math.round((point.x / 640) * (world.fieldWidth - 1))] * 0.19;
+    expect(point.y).toBeCloseTo(expectedY, 3);
+  });
+
+  it("scales river width globally while keeping its route unchanged", () => {
     const narrow = createLandscapeWorld(640, 360, { ...baseOptions, water: 0.35 });
     const wide = createLandscapeWorld(640, 360, { ...baseOptions, water: 0.7 });
     expect(narrow.river).toHaveLength(wide.river.length);
     for (let index = 0; index < narrow.river.length; index += 1) {
+      expect(narrow.river[index].x).toBe(wide.river[index].x);
+      expect(narrow.river[index].y).toBe(wide.river[index].y);
       expect(narrow.river[index].width).toBeCloseTo(wide.river[index].width * 0.5, 5);
     }
-  });
-
-  it("widens the river toward the foreground using perspective", () => {
-    const world = createLandscapeWorld(640, 360, baseOptions);
-    expect(world.river.length).toBeGreaterThan(20);
-    expect(world.river[0].width).toBeLessThan(world.river[world.river.length - 1].width);
-    expect(world.river[0].y).toBeLessThan(360 * 0.8);
-    expect(world.river[world.river.length - 1].y).toBeGreaterThan(360);
-    expect(world.river[world.river.length - 1].y).toBeGreaterThan(world.river[0].y);
   });
 
   it("does not create a river when water is disabled", () => {
@@ -58,10 +64,11 @@ describe("shared landscape world", () => {
     expect(world.river).toHaveLength(0);
   });
 
-  it("changes terrain and the route interior when mountain parameters change", () => {
+  it("changes shared terrain and drainage when mountain parameters change", () => {
     const calm = createLandscapeWorld(640, 360, baseOptions);
     const rugged = createLandscapeWorld(640, 360, { ...baseOptions, roughness: 0.95, scale: 1.8 });
-    expect(Array.from(calm.layers[2].surface)).not.toEqual(Array.from(rugged.layers[2].surface));
-    expect(calm.river.slice(1, -1)).not.toEqual(rugged.river.slice(1, -1));
+    expect(Array.from(calm.elevation)).not.toEqual(Array.from(rugged.elevation));
+    expect(calm.river.map((point) => [point.x, point.y]))
+      .not.toEqual(rugged.river.map((point) => [point.x, point.y]));
   });
 });
