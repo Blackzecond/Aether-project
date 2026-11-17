@@ -1,4 +1,4 @@
-import { sampleSurface, worldToGrid, type Heightfield } from "../fields/heightfield";
+import { sampleSurface, type Heightfield } from "../fields/heightfield";
 import type { RiverNetwork } from "../hydrology/rivers";
 
 export interface VegetationInstance {
@@ -29,8 +29,6 @@ export function generateVegetation(
   const stride = 3;
   const candidatesX = Math.floor((field.width - 2) / stride);
   const candidatesZ = Math.floor((field.height - 2) / stride);
-  const cellWidth = (field.bounds.maxX - field.bounds.minX) / (field.width - 1);
-  const cellDepth = (field.bounds.maxZ - field.bounds.minZ) / (field.height - 1);
   const maxTrees = 1800;
 
   for (let gz = 2; gz < field.height - 2; gz += stride) {
@@ -47,6 +45,8 @@ export function generateVegetation(
       const gridZ = Math.max(1, Math.min(field.height - 2, gz + jitterZ));
       const x = field.bounds.minX + gridX / (field.width - 1) * (field.bounds.maxX - field.bounds.minX);
       const z = field.bounds.minZ + gridZ / (field.height - 1) * (field.bounds.maxZ - field.bounds.minZ);
+      const centerX=(field.bounds.minX+field.bounds.maxX)*0.5,centerZ=(field.bounds.minZ+field.bounds.maxZ)*0.5;
+      if(Math.hypot(x-centerX,z-centerZ)<0.014) continue;
       const surface = sampleSurface(field, x, z);
       const elevation = surface.elevation;
       if (elevation < 0.035 || elevation > 0.92 || surface.slope > 0.78) continue;
@@ -82,9 +82,5 @@ export function generateVegetation(
     if (instances.length >= maxTrees) break;
   }
 
-  void candidatesX;
-  void candidatesZ;
-  void cellWidth;
-  void cellDepth;
   return { instances, diagnostics: { candidates: candidatesX * candidatesZ, trees: instances.length } };
 }
