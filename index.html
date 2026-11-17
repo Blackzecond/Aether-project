@@ -18,7 +18,7 @@
     .lab-layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;margin-top:16px;align-items:start}
     .lab-panel{min-width:0;border:1px solid #34443d;border-radius:14px;overflow:hidden;background:#202e2a}
     .lab-canvas{height:min(68vh,680px);min-height:340px;background:#101b19}
-    .lab-canvas canvas{width:100%;height:100%;display:block;touch-action:pan-y}
+    .lab-canvas canvas{width:100%;height:100%;display:block;touch-action:none}
     .lab-controls{padding:14px}
     .lab-controls h2{font-size:15px;margin:0 0 5px}
     .lab-help{font-size:11px;color:#9daf9f;line-height:1.55;margin:0 0 12px}
@@ -32,7 +32,7 @@
     .lab-actions button{flex:1;min-height:38px;border:1px solid #52665a;border-radius:8px;background:#293a33;color:#e8eee9}
     .lab-note{padding:12px;color:#9daf9f;font-size:10px;line-height:1.6;margin:0}
     .lab-status{font-size:11px;color:#b9d3bd}
-    .lab-heading{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px}
+    .lab-heading{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px}.lab-heading button{border:1px solid #52665a;border-radius:7px;background:#293a33;color:#dce8df;padding:6px 9px;font-size:10px}
     @media(max-width:760px){.lab-layout{grid-template-columns:1fr}.lab-canvas{height:48vh;min-height:280px}.lab-shell{width:calc(100% - 20px)}.lab-controls{display:grid;grid-template-columns:1fr 1fr;column-gap:14px}.lab-controls h2,.lab-help,.lab-controls label[for="debug-mode"],#debug-mode,.lab-actions{grid-column:1/-1}}
   </style>
 </head>
@@ -44,10 +44,10 @@
     </header>
     <div class="lab-layout">
       <section class="lab-panel" aria-label="ตัวอย่างภูมิประเทศ">
-        <div class="lab-heading"><strong>พื้นผิวภูมิประเทศ · WebGL2</strong><span class="lab-status">WORLD SPACE</span></div>
+        <div class="lab-heading"><strong>พื้นผิวภูมิประเทศ · WebGL2</strong><button id="reset-camera" type="button">รีเซ็ตมุมกล้อง</button></div>
         <div class="lab-canvas"><canvas id="terrain-canvas" aria-label="พื้นผิวภูมิประเทศสามมิติ"></canvas></div>
         <div class="lab-meta" id="lab-metrics"></div>
-        <p class="lab-note">นี่คือ Heightfield แบบสองมิติที่สร้างเป็น Mesh จริง มีความสูง ความลาดชัน Normal และ Depth Buffer ระบบแม่น้ำ ป่าไม้ และบรรยากาศจะยังไม่ถูกเพิ่มจนกว่ารูปทรงพื้นฐานจะผ่านการตรวจสอบ</p>
+        <p class="lab-note">ลากเพื่อหมุน · ใช้สองนิ้วเพื่อซูม · นี่คือ Heightfield แบบสองมิติที่สร้างเป็น Mesh จริง มีความสูง ความลาดชัน Normal และ Depth Buffer ระบบแม่น้ำ ป่าไม้ และบรรยากาศจะยังไม่ถูกเพิ่มจนกว่ารูปทรงพื้นฐานจะผ่านการตรวจสอบ</p>
       </section>
       <aside class="lab-panel lab-controls">
         <h2>ปรับแต่งภูเขา</h2>
