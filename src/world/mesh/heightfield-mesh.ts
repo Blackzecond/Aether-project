@@ -101,7 +101,7 @@ export function buildHeightfieldMesh(field: Heightfield, verticalScale = 1): Ter
     const finalZ = cornerZ ? outerZ : oz;
     const dx = finalX - x, dz = finalZ - z;
     const length = Math.hypot(dx, dz) || 1;
-    put(groundStart + i, finalX, baseY, finalZ, dx / length, 0.15, dz / length);
+    put(groundStart + i, finalX, baseY, finalZ, 0, 1, 0);
     const next = (i + 1) % perimeter.length;
     const topA = surfaceIndex;
     const topB = perimeter[next];
