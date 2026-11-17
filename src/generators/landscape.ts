@@ -104,59 +104,47 @@ function drawForestLayer(
   }
 }
 
-function traceRiverEdge(world: LandscapeWorld, side: -1 | 1, extraWidth = 0): Array<{ x: number; y: number }> {
-  return world.river.map((point, index) => {
-    const before = world.river[Math.max(0, index - 1)];
-    const after = world.river[Math.min(world.river.length - 1, index + 1)];
-    const dx = after.x - before.x;
-    const dy = after.y - before.y;
-    const length = Math.max(0.001, Math.hypot(dx, dy));
-    const offset = point.width + extraWidth;
-    return { x: point.x - (dy / length) * offset * side, y: point.y + (dx / length) * offset * side };
-  });
-}
-
 function drawRiver(context: CanvasRenderingContext2D, world: LandscapeWorld, strength: number, palette: (typeof palettes)[number]): void {
   if (strength <= 0.01 || world.river.length < 2) return;
-  const drawChannel = (extraWidth: number, color: string, alpha: number): void => {
-    const left = traceRiverEdge(world, -1, extraWidth);
-    const right = traceRiverEdge(world, 1, extraWidth);
+
+  // Overlapping round segments avoid the self-intersections of offset polygons.
+  const strokeRoute = (extraWidth: number, color: string, alpha: number): void => {
     context.save();
     context.globalAlpha = alpha;
-    context.beginPath();
-    left.forEach((point, index) => {
-      if (index === 0) context.moveTo(point.x, point.y);
-      else context.lineTo(point.x, point.y);
-    });
-    for (let index = right.length - 1; index >= 0; index -= 1) {
-      context.lineTo(right[index].x, right[index].y);
+    context.strokeStyle = color;
+    context.lineCap = "round";
+    context.lineJoin = "round";
+    for (let index = 0; index < world.river.length - 1; index += 1) {
+      const point = world.river[index];
+      const next = world.river[index + 1];
+      context.lineWidth = Math.max(1, point.width + next.width + extraWidth * 2);
+      context.beginPath();
+      context.moveTo(point.x, point.y);
+      context.lineTo(next.x, next.y);
+      context.stroke();
     }
-    context.closePath();
-    context.fillStyle = color;
-    context.fill();
     context.restore();
   };
 
-  drawChannel(world.height * (0.003 + strength * 0.004), palette.bank, 0.9);
-  drawChannel(0, palette.water, 0.82 + strength * 0.15);
+  strokeRoute(world.height * 0.006, palette.bank, 0.92);
+  strokeRoute(0, palette.water, 0.86 + strength * 0.12);
 
   context.save();
+  context.globalAlpha = 0.24;
+  context.strokeStyle = palette.waterLight;
   context.lineCap = "round";
-  for (const index of [15, 29, 44, 58]) {
+  context.lineJoin = "round";
+  for (let index = 13; index < world.river.length - 4; index += 15) {
     const point = world.river[index];
-    const next = world.river[Math.min(world.river.length - 1, index + 3)];
-    if (!point || !next) continue;
-    context.globalAlpha = 0.18 + (index / world.river.length) * 0.32;
-    context.strokeStyle = palette.waterLight;
-    context.lineWidth = Math.max(0.7, point.width * 0.16);
+    const next = world.river[index + 3];
+    context.lineWidth = Math.max(0.7, point.width * 0.13);
     context.beginPath();
-    context.moveTo(point.x - point.width * 0.2, point.y);
-    context.quadraticCurveTo(point.x, point.y + (next.y - point.y) * 0.45, next.x + point.width * 0.2, next.y);
+    context.moveTo(point.x - point.width * 0.12, point.y);
+    context.quadraticCurveTo(point.x, (point.y + next.y) * 0.5, next.x + point.width * 0.12, next.y);
     context.stroke();
   }
   context.restore();
 }
-
 export function drawLandscape(context: CanvasRenderingContext2D, width: number, height: number, options: LandscapeOptions): void {
   const palette = palettes[Math.abs(options.seed) % palettes.length];
   const world = createLandscapeWorld(width, height, options);
