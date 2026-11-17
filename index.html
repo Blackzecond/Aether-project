@@ -79,6 +79,16 @@
             </select>
             <button id="add-node" class="quiet-button" type="button">+ เพิ่ม Node</button>
           </div>
+          <div class="graph-organize-toolbar">
+            <input id="graph-search" type="search" placeholder="ค้นหา Node หรือชนิด..." aria-label="ค้นหา Node" />
+            <select id="graph-category" aria-label="กรองตามหมวดหมู่">
+              <option value="all">ทุกหมวดหมู่</option>
+              <option value="NUMBER">ตัวเลข</option>
+              <option value="MATH">คณิตศาสตร์</option>
+              <option value="OUTPUT">ผลลัพธ์</option>
+            </select>
+          </div>
+          <p id="graph-filter-count" class="graph-filter-count">แสดง Node ทั้งหมด</p>
           <div class="graph-view-toolbar">
             <button id="graph-zoom-out" class="quiet-button" type="button" aria-label="ซูมออก">−</button>
             <button id="graph-zoom-reset" class="quiet-button" type="button">รีเซ็ตมุมมอง</button>
