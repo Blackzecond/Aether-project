@@ -286,7 +286,9 @@ function multiply(a: Float32Array, b: Float32Array): Float32Array {
 
 const MODE: Record<TerrainViewMode, number> = { world: 0, "first-person": 0, shaded: 0, elevation: 1, slope: 2, normals: 3, wireframe: 4, hydrology: 5 };
 
-interface VolumeLodGpu {readonly vao:WebGLVertexArrayObject;readonly indexBuffer:WebGLBuffer;readonly chunks:readonly VolumeMeshChunk[];readonly indexCount:number}\n\nexport class TerrainPreviewRenderer {
+interface VolumeLodGpu {readonly vao:WebGLVertexArrayObject;readonly indexBuffer:WebGLBuffer;readonly chunks:readonly VolumeMeshChunk[];readonly indexCount:number}
+
+export class TerrainPreviewRenderer {
   private readonly gl: WebGL2RenderingContext;
   private readonly program: WebGLProgram;
   private readonly vao: WebGLVertexArrayObject;
@@ -327,7 +329,8 @@ interface VolumeLodGpu {readonly vao:WebGLVertexArrayObject;readonly indexBuffer
   private vertexCount = 0;
   private surfaceVertexCount = 0;
   private usesVolumeMesh = false;
-  private volumeChunks: readonly VolumeMeshChunk[] = [];\n  private volumeLodGpu:VolumeLodGpu[]=[];
+  private volumeChunks: readonly VolumeMeshChunk[] = [];
+  private volumeLodGpu:VolumeLodGpu[]=[];
   private triangleCount = 0;
   private lineCount = 0;
   private mode: TerrainViewMode = "world";
@@ -839,7 +842,8 @@ interface VolumeLodGpu {readonly vao:WebGLVertexArrayObject;readonly indexBuffer
     gl.deleteBuffer(this.indexBuffer);
     gl.deleteBuffer(this.lineBuffer);
     gl.deleteBuffer(this.accumulationBuffer);
-    gl.deleteBuffer(this.channelBuffer);\n    for(const lod of this.volumeLodGpu.slice(1)){gl.deleteBuffer(lod.indexBuffer);gl.deleteVertexArray(lod.vao);}
+    gl.deleteBuffer(this.channelBuffer);
+    for(const lod of this.volumeLodGpu.slice(1)){gl.deleteBuffer(lod.indexBuffer);gl.deleteVertexArray(lod.vao);}
     gl.deleteVertexArray(this.vao);
     gl.deleteProgram(this.program);
     gl.deleteBuffer(this.waterBuffer);gl.deleteVertexArray(this.waterVao);gl.deleteProgram(this.waterProgram);
