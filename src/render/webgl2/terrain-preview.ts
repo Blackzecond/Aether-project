@@ -81,7 +81,7 @@ vec3 terrainColor(float height, float slope) {
 
 void main() {
   vec3 n = normalize(vNormal);
-  float height = clamp(vPosition.y / 1.5, 0.0, 1.0);
+  float height = clamp(vPosition.y / 0.92, 0.0, 1.0);
   float slope = 1.0 - clamp(n.y, 0.0, 1.0);
   vec3 color;
 
@@ -588,7 +588,7 @@ export class TerrainPreviewRenderer {
     this.maximumAccumulation=1;
     let minHeight=Infinity,maxHeight=-Infinity;
     for(const value of field.values){minHeight=Math.min(minHeight,value);maxHeight=Math.max(maxHeight,value);}
-    const baseY=Math.min(0,minHeight*1.18-0.012),maxY=maxHeight*1.18;
+    const baseY=Math.min(0,minHeight-0.012),maxY=maxHeight;
     this.cameraTarget=[
       (field.bounds.minX+field.bounds.maxX)*0.5,
       baseY+(maxY-baseY)*0.32,
@@ -691,7 +691,7 @@ export class TerrainPreviewRenderer {
           const x=catmull(p0.x,p1.x,p2.x,p3.x,t);
           const z=catmull(p0.z,p1.z,p2.z,p3.z,t);
           const width=Math.max(0.0012,catmull(p0.w,p1.w,p2.w,p3.w,t));
-          sections.push({x,z,y:sampleElevation(field,x,z)*1.18+0.012,w:width});
+          sections.push({x,z,y:sampleElevation(field,x,z)+0.0018,w:width});
         }
         for(let step=0;step<subdivisions;step++){
           const a=sections[step],b=sections[step+1];
@@ -746,7 +746,7 @@ export class TerrainPreviewRenderer {
 
     const exploring = this.mode === "first-person";
     const camera = exploring && this.field
-      ? [this.playerX, sampleElevation(this.field, this.playerX, this.playerZ) * 1.18 + this.humanEyeHeight, this.playerZ]
+      ? [this.playerX, sampleElevation(this.field, this.playerX, this.playerZ) + this.humanEyeHeight, this.playerZ]
       : (() => {
           const horizontal = Math.cos(this.elevation) * this.distance;
           return [
