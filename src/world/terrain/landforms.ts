@@ -15,13 +15,13 @@ const smoothstep = (edge0: number, edge1: number, value: number): number => {
  * ridges, this creates branching, intersecting mountain crests and valleys.
  */
 function ridgedMountains(x: number, z: number, seed: number, spacing: number, sharpness: number): number {
-  const baseFrequency = 1.35 / spacing;
+  const baseFrequency = 1.12 / spacing;
   let frequency = baseFrequency;
   let amplitude = 1;
   let total = 0;
   let weightSum = 0;
   let weight = 1;
-  const exponent = 0.85 + sharpness * 2.65;
+  const exponent = 0.72 + sharpness * 1.75;
 
   for (let octave = 0; octave < 5; octave += 1) {
     const signal = 1 - Math.abs(gradientNoise2(x * frequency, z * frequency, seed + octave * 1013));
@@ -100,9 +100,19 @@ export function generateTerrain(recipe: TerrainRecipe): TerrainGeneration {
       );
 
       const mountainBody = massif * (0.16 + ridges * 0.78);
+      // Fine, low-amplitude rock weathering is baked into the heightfield,
+      // not painted only into the fragment shader. The 256² grid resolves
+      // these broad fractured-rock forms without turning the whole mountain
+      // into a noisy polygon surface.
+      const weatheringMask = smoothstep(0.12, 0.48, massif);
+      const rockWeathering = (
+        gradientNoise2(x * 18.0, z * 18.0, seed + 5003) * 0.010
+        + gradientNoise2(x * 36.0, z * 36.0, seed + 5009) * 0.0035
+      ) * weatheringMask;
       const elevation = 0.025
         + (mountainBody + foothills) * landform.relief
-        + detail * landform.roughness;
+        + detail * landform.roughness
+        + rockWeathering;
       // Fade the outer 13% of the world into a low plain so the terrain
       // joins the surrounding ground instead of ending as a raised island.
       const edgeDistance = Math.min(
