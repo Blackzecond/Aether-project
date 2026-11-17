@@ -430,6 +430,9 @@ graphStage.addEventListener("change", (event) => {
   scheduleRender();
 });
 
+graphSearchInput.addEventListener("input", renderGraphEditor);
+graphCategorySelect.addEventListener("change", renderGraphEditor);
+
 requiredElement<HTMLButtonElement>("#add-node").addEventListener("click", () => {
   const type = nodeTypeSelect.value;
   let id = "node-" + nodeCounter++;
