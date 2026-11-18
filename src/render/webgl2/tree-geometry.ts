@@ -80,11 +80,11 @@ export function buildProceduralTreeGeometry(detail: TreeGeometryDetail = "high")
     const leftTip=add(tip,mul(side,width*0.02)),rightTip=add(tip,mul(side,-width*0.02));
     const leftMid=add(add(center,mul(side,width)),mul(normal,size*0.10));
     const rightMid=add(add(center,mul(side,-width)),mul(normal,size*0.10));
-    triangle(leftBase,normal,-0.10,0,rightBase,normal,0.10,0,leftMid,normal,-1,0.52,1);
-    triangle(rightBase,normal,0.10,0,rightMid,normal,1,0.52,leftMid,normal,-1,0.52,1);
+    triangle(leftBase,normal,-0.005,0,rightBase,normal,0.005,0,leftMid,normal,-0.48,0.52,1);
+    triangle(rightBase,normal,0.005,0,rightMid,normal,0.48,0.52,leftMid,normal,-0.48,0.52,1);
     const back=mul(normal,-1);
-    triangle(leftMid,back,-1,0.52,rightMid,back,1,0.52,leftTip,back,0.10,1,1);
-    triangle(leftMid,back,-1,0.52,leftTip,back,-0.10,1,rightTip,back,0.10,1,1);
+    triangle(leftMid,back,-0.48,0.52,rightMid,back,0.48,0.52,leftTip,back,-0.005,1,1);
+    triangle(leftMid,back,-0.48,0.52,leftTip,back,-0.005,1,rightTip,back,0.005,1,1);
   };
 
   const high=detail==="high",medium=detail==="medium";
