@@ -276,96 +276,71 @@ function buildGroundCoverGeometry(): GroundGeometryData {
 
 function buildTreeGeometry(): Float32Array {
   const out:number[]=[];
-  const smoothTri=(p0:number[],n0:number[],p1:number[],n1:number[],p2:number[],n2:number[])=>{
+  const unit=(v:number[])=>{const n=Math.hypot(...v);return n>1e-7?v.map(x=>x/n):[0,1,0];};
+  const tri=(p0:number[],n0:number[],p1:number[],n1:number[],p2:number[],n2:number[])=>{
     for(const [p,n] of [[p0,n0],[p1,n1],[p2,n2]] as const)out.push(p[0],p[1],p[2],n[0],n[1],n[2]);
   };
   const tube=(a:number[],b:number[],ra:number,rb:number,segments=7)=>{
-    const axis=normalize(subtract(b,a));
-    const ref=Math.abs(axis[1])>0.92?[1,0,0]:[0,1,0];
-    const side=normalize(cross(axis,ref)),up=cross(axis,side);
-    const ring=(p:number[],r:number,t:number)=>p.map((v,k)=>v+(side[k]*Math.cos(t)+up[k]*Math.sin(t))*r);
-    const normal=(t:number)=>normalize(side.map((v,k)=>v*Math.cos(t)+up[k]*Math.sin(t)));
+    const axis=unit(subtract(b,a)),ref=Math.abs(axis[1])>0.92?[1,0,0]:[0,1,0];
+    const side=unit(cross(axis,ref)),up=cross(axis,side);
+    const point=(p:number[],r:number,t:number)=>p.map((v,k)=>v+(side[k]*Math.cos(t)+up[k]*Math.sin(t))*r);
+    const norm=(t:number)=>unit(side.map((v,k)=>v*Math.cos(t)+up[k]*Math.sin(t)));
     for(let i=0;i<segments;i++){
-      const p=i/segments*Math.PI*2,q=(i+1)/segments*Math.PI*2;
-      const a0=ring(a,ra,p),a1=ring(a,ra,q),b0=ring(b,rb,p),b1=ring(b,rb,q);
-      const np=normal(p),nq=normal(q);
-      smoothTri(a0,np,b0,np,a1,nq);smoothTri(a1,nq,b0,np,b1,nq);
+      const p=i/segments*Math.PI*2,q=(i+1)/segments*Math.PI*2,a0=point(a,ra,p),a1=point(a,ra,q),b0=point(b,rb,p),b1=point(b,rb,q),np=norm(p),nq=norm(q);
+      tri(a0,np,b0,np,a1,nq);tri(a1,nq,b0,np,b1,nq);
     }
   };
-  // A gently cupped, pointed leaf surface with a raised midrib and a narrow tip.
   const leaf=(base:number[],tip:number[],width:number,phase:number)=>{
-    const axis=normalize(subtract(tip,base));
-    const side=normalize(cross(axis,[Math.sin(phase),0.28,Math.cos(phase)]));
-    const normal=normalize(cross(side,axis));
-    const sections=[0,0.28,0.58,0.82,1];
-    const rows=sections.map((t,i)=>{
-      const center=base.map((v,k)=>v+(tip[k]-v)*t+normal[k]*Math.sin(Math.PI*t)*width*0.16);
-      const w=width*Math.pow(Math.sin(Math.PI*t),0.82)*(i===0||i===4?0.035:1);
-      const ridge=center.map((v,k)=>v+normal[k]*width*0.12);
-      return {left:center.map((v,k)=>v+side[k]*w),right:center.map((v,k)=>v-side[k]*w),ridge};
+    const axis=unit(subtract(tip,base)),side=unit(cross(axis,[Math.sin(phase),0.28,Math.cos(phase)])),normal=unit(cross(side,axis));
+    const ts=[0,0.42,0.78,1];
+    const rows=ts.map((t,i)=>{
+      const c=base.map((v,k)=>v+(tip[k]-v)*t+normal[k]*Math.sin(Math.PI*t)*width*0.12);
+      const w=width*Math.pow(Math.sin(Math.PI*t),0.8)*(i===0||i===3?0.025:1);
+      return {l:c.map((v,k)=>v+side[k]*w),r:c.map((v,k)=>v-side[k]*w),m:c.map((v,k)=>v+normal[k]*width*0.10)};
     });
+    const back=normal.map(v=>-v);
     for(let i=0;i<rows.length-1;i++){
       const a=rows[i],b=rows[i+1];
-      smoothTri(a.left,normal,a.ridge,normal,b.left,normal);
-      smoothTri(a.ridge,normal,b.ridge,normal,b.left,normal);
-      smoothTri(a.ridge,normal,a.right,normal,b.ridge,normal);
-      smoothTri(a.right,normal,b.right,normal,b.ridge,normal);
-      const back=normal.map(v=>-v);
-      smoothTri(b.left,back,a.ridge,back,a.left,back);
-      smoothTri(b.left,back,b.ridge,back,a.ridge,back);
-      smoothTri(b.ridge,back,a.right,back,b.right,back);
-      smoothTri(b.ridge,back,a.right,back,b.ridge,back);
+      tri(a.l,normal,a.m,normal,b.l,normal);tri(a.m,normal,b.m,normal,b.l,normal);
+      tri(a.m,normal,a.r,normal,b.m,normal);tri(a.r,normal,b.r,normal,b.m,normal);
+      tri(b.l,back,a.m,back,a.l,back);tri(b.l,back,b.m,back,a.m,back);
+      tri(b.m,back,a.r,back,b.r,back);tri(a.r,back,b.m,back,b.r,back);
     }
   };
-  const hash=(n:number)=>{const x=Math.sin(n*127.1+19.19)*43758.5453;return x-Math.floor(x);};
-  const addFoliageCluster=(center:number[],size:number,seed:number)=>{
-    // Leaves fan out in several directions and occupy different depths, avoiding a single solid crown blob.
-    const count=9;
-    for(let i=0;i<count;i++){
-      const h=hash(seed*17+i*3.1),angle=i/count*Math.PI*2+hash(seed+i)*0.7;
-      const elevation=-0.18+h*0.88;
-      const radial=size*(0.48+h*0.34);
-      const base=[center[0]+Math.cos(angle)*radial*0.22,center[1]+(h-0.5)*size*0.28,center[2]+Math.sin(angle)*radial*0.22];
-      const tip=[center[0]+Math.cos(angle)*radial,center[1]+elevation*size+size*0.12,center[2]+Math.sin(angle)*radial];
-      leaf(base,tip,size*(0.105+h*0.025),angle+i*0.31);
+  const rand=(n:number)=>{const x=Math.sin(n*91.73+17.31)*43758.5453;return x-Math.floor(x);};
+  const foliage=(center:number[],size:number,seed:number)=>{
+    // Five loose leaves per twig tip: enough overlap for a natural cluster without a dense solid mass.
+    for(let i=0;i<5;i++){
+      const a=i/5*Math.PI*2+rand(seed+i)*0.55,h=rand(seed*3+i),r=size*(0.48+h*0.25);
+      const base=[center[0]+Math.cos(a)*r*0.18,center[1]+(h-0.5)*size*0.18,center[2]+Math.sin(a)*r*0.18];
+      const tip=[center[0]+Math.cos(a)*r,center[1]+size*(0.10+h*0.30),center[2]+Math.sin(a)*r];
+      leaf(base,tip,size*0.13,a+0.3);
     }
   };
-  let branchId=1;
-  const growBranch=(origin:number[],direction:number[],length:number,radius:number,depth:number,seed:number)=>{
-    const dir=normalize(direction);
-    const end=origin.map((v,k)=>v+dir[k]*length);
-    tube(origin,end,radius,Math.max(0.0012,radius*0.62),depth===0?8:6);
-    if(depth===0){addFoliageCluster(end,length*0.43,seed);return;}
-    const side=normalize(cross(dir,[Math.sin(seed*2.13),0.24,Math.cos(seed*1.71)]));
-    const up=normalize(cross(side,dir));
-    const children=depth===2?3:2;
-    for(let i=0;i<children;i++){
-      const spread=(i-(children-1)*0.5)*0.72;
-      const twist=seed*2.399+i*2.399;
-      const lateral=side.map((v,k)=>v*Math.cos(twist)+up[k]*Math.sin(twist));
-      const childDir=normalize(dir.map((v,k)=>v*0.60+lateral[k]*(0.66+Math.abs(spread)*0.16)+up[k]*(0.12+hash(seed+i)*0.12)));
-      const childOrigin=origin.map((v,k)=>v+(end[k]-v)*(0.48+i*0.10));
-      growBranch(childOrigin,childDir,length*(0.62+hash(seed*3+i)*0.12),radius*0.62,depth-1,branchId++);
-    }
-  };
-  // Flared roots merge into a subtly curved trunk.
-  for(let i=0;i<7;i++){
-    const a=i/7*Math.PI*2+0.17,dx=Math.cos(a),dz=Math.sin(a);
-    tube([dx*0.025,0.12,dz*0.025],[dx*0.13,0.035,dz*0.13],0.027,0.013,6);
-    tube([dx*0.13,0.035,dz*0.13],[dx*0.23,-0.035,dz*0.23],0.013,0.0018,5);
+  // Flared roots and a gently bending, tapered trunk.
+  for(let i=0;i<6;i++){
+    const a=i/6*Math.PI*2+0.2,x=Math.cos(a),z=Math.sin(a);
+    tube([x*0.025,0.12,z*0.025],[x*0.13,0.035,z*0.13],0.024,0.010,5);
+    tube([x*0.13,0.035,z*0.13],[x*0.21,-0.035,z*0.21],0.010,0.0015,5);
   }
-  const trunk=[[0,0,0],[0.012,0.25,-0.006],[-0.009,0.52,0.008],[0.014,0.77,0.002],[0.018,1,0]];
-  for(let i=0;i<trunk.length-1;i++)tube(trunk[i],trunk[i+1],0.067-i*0.014,0.053-i*0.014,10);
-  // Five staggered whorls of primary branches, each recursively splitting into secondary and tertiary limbs.
-  for(let tier=0;tier<5;tier++){
-    const y=0.30+tier*0.135;
-    const trunkPoint=[Math.sin(tier*1.31)*0.012,y,Math.cos(tier*1.73)*0.009];
-    const count=tier===4?4:5;
-    for(let j=0;j<count;j++){
-      const angle=j/count*Math.PI*2+tier*2.17;
-      const length=(0.36-tier*0.035)*(0.82+hash(tier*11+j)*0.24);
-      const direction=[Math.cos(angle)*0.82,0.42+hash(j+tier*7)*0.18,Math.sin(angle)*0.82];
-      growBranch(trunkPoint,direction,length,0.026-tier*0.003,2,tier*13+j+1);
+  const trunk=[[0,0,0],[0.012,0.26,-0.006],[-0.009,0.52,0.008],[0.014,0.77,0.002],[0.018,1,0]];
+  for(let i=0;i<trunk.length-1;i++)tube(trunk[i],trunk[i+1],0.065-i*0.014,0.052-i*0.014,9);
+  // Four staggered whorls; each primary limb splits into only two fine twigs.
+  let seed=1;
+  for(let tier=0;tier<4;tier++){
+    const y=0.34+tier*0.145,origin=[Math.sin(tier*1.4)*0.012,y,Math.cos(tier*1.8)*0.01];
+    for(let j=0;j<4;j++){
+      const a=j/4*Math.PI*2+tier*1.83,len=(0.35-tier*0.045)*(0.88+rand(seed)*0.16);
+      const end=[origin[0]+Math.cos(a)*len, y+len*0.34, origin[2]+Math.sin(a)*len];
+      tube(origin,end,0.023-tier*0.002,0.006,6);
+      for(let k=0;k<2;k++){
+        const sideAngle=a+(k===0?-0.58:0.58),t=0.56+k*0.12;
+        const start=origin.map((v,n)=>v+(end[n]-v)*t);
+        const twigEnd=[start[0]+Math.cos(sideAngle)*len*0.43,start[1]+len*0.28,start[2]+Math.sin(sideAngle)*len*0.43];
+        tube(start,twigEnd,0.007,0.002,5);
+        foliage(twigEnd,len*0.34,seed++);
+      }
+      foliage(end,len*0.32,seed++);
     }
   }
   return new Float32Array(out);
