@@ -1,40 +1,52 @@
 # Aether — Procedural World Generator
 
-Aether is being rebuilt around a shared world-space model. Terrain is the authoritative foundation: every later system (water, vegetation, atmosphere, lighting) will derive from the same sampled world rather than drawing independent screen-space layers.
+Aether is built around one shared world-space model. The terrain is the authoritative foundation: hydrology, vegetation, atmosphere and lighting must derive from the same surface and coordinates rather than drawing independent scenery layers.
 
-## Current foundation
+## Active world pipeline
 
-- Canonical X/Y/Z world coordinates and validated, versioned terrain recipes
-- Deterministic seeded gradient noise and fBm
-- 2D heightfield sampling with bilinear elevation, finite-difference normals, slope and curvature
-- Indexed heightfield mesh with per-vertex normals
-- WebGL2 terrain renderer with shaded, elevation, slope, normal and wireframe diagnostic views
-- Terrain controls update the generated world immediately
-- Automated tests for determinism, parameter response, surface sampling and mesh integrity
+- Deterministic, seeded terrain generation in a dedicated Web Worker
+- A 256 × 256 macro heightfield is the authoritative surface for terrain, water and vegetation
+- Indexed WebGL2 terrain mesh with per-vertex normals
+- Hydrology and vegetation sample the same heightfield used by the rendered terrain
+- Terrain controls regenerate the shared world without blocking the UI
+- WebGPU is optional; the active macro-terrain path has a WebGL2-compatible CPU baseline
+
+The former global low-resolution density-volume terrain is no longer used for the main mountain surface. It produced coarse vertical sampling and allowed arbitrary ellipsoid unions to create detached summit blobs. The density/SDF code is retained as experimental groundwork; volumetric geometry should be introduced only for localized features that need caves, arches or overhangs, not as a replacement for the entire heightfield.
+
+## Vegetation foundation
+
+- Forest stands use broad and medium-scale habitat masks, clustered candidate placement and local spacing competition
+- Tree instances share a procedural tapered trunk and branching skeleton with individual leaf geometry
+- Tree orientation, crown width, height and tint vary deterministically by seed
+- Ground cover uses curved, tapered grass blades, fern fronds, low moss patches and small stones
+- Instanced rendering keeps geometry shared across many vegetation placements
+- Ground-cover candidates are sampled across the full world instead of stopping at an arbitrary scan-order limit
+
+This is a procedural foundation, not a claim of final photorealism. Species-specific models, canopy/understory competition, vegetation LOD and wind animation remain future quality work.
 
 ## Run locally
 
-```bash
+\`\`\`bash
 npm install
 npm run dev
-```
+\`\`\`
 
-Open the root page. The production entry point is `index.html`.
+Open the root page. The production entry point is \`index.html\`.
 
 ## Checks
 
-```bash
+\`\`\`bash
 npm test
 npm run typecheck
 npm run build
-```
+\`\`\`
 
 ## Development sequence
 
-1. Accept and validate the terrain shape and controls.
-2. Derive drainage and water flow from terrain.
-3. Derive biome and vegetation suitability from terrain and hydrology.
+1. Stabilize the shared macro terrain and add localized volumetric features only where needed.
+2. Build believable forest stands, tree species, ground cover and vegetation LOD.
+3. Convert drainage into a connected river graph and continuous carved channels.
 4. Add atmosphere, lighting and depth-aware rendering.
-5. Optimize quality levels and mobile performance.
+5. Validate fixed-seed scenes and optimize mobile quality tiers.
 
-Do not add independent screen-space scenery layers. New systems must query the shared world model.
+Every subsystem must use the same world coordinates and sample the authoritative terrain surface. Changes should pass deterministic/data-integrity tests before visual acceptance on a real device.
