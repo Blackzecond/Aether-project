@@ -82,9 +82,13 @@ export function generateVegetation(field:Heightfield,seed:number,rivers?:RiverNe
     const species:TreeSpecies=surface.elevation>0.52
       ?(variety<0.78?1:2)
       :(variety<0.58?0:variety<0.84?1:2);
+    const ageRoll=hash(seed+83,gx,gz);
+    // A stand has a few mature canopy trees and many shorter mid-storey trees.
+    const canopyHeight=0.014+Math.pow(ageRoll,1.62)*0.042;
+    const slopeLean=1.0-Math.min(0.18,surface.slope*0.16);
     trees.push({
-      x,y:surface.elevation+0.0002,z,
-      height:0.020+hash(seed+83,gx,gz)*0.024,
+      x,y:surface.elevation+0.00008,z,
+      height:canopyHeight*slopeLean,
       tint:hash(seed+97,gx,gz),
       species,
     });
@@ -105,7 +109,7 @@ export function generateVegetation(field:Heightfield,seed:number,rivers?:RiverNe
     if(surface.elevation<0.018||surface.elevation>0.94||surface.slope>1.0)continue;
     const nearWater=water[Math.round(sz)*field.width+Math.round(sx)]!==0;
     const roll=hash(seed+167,Math.floor(gx*10),Math.floor(gz*10));
-    const chance=0.18+meadow*0.26+forest*0.30+(nearWater?0.14:0);
+    const chance=0.22+meadow*0.34+forest*0.34+(nearWater?0.16:0);
     if(roll>chance)continue;
     let kind:GroundCoverInstance["kind"];
     if(surface.slope>0.72&&roll>0.46)kind=3;
