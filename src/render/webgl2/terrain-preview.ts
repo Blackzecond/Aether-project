@@ -301,13 +301,31 @@ function buildTreeGeometry(): Float32Array {
       smoothTri(a0,np,b0,np,a1,nq);smoothTri(a1,nq,b0,np,b1,nq);
     }
   };
+  // Individual lance-shaped leaves replace the old ellipsoid canopy masses.
+  // Each leaf has a raised midrib and a tapered outline, with both sides visible.
   const leaf=(base:number[],tip:number[],width:number,phase:number)=>{
-    const dx=tip[0]-base[0],dz=tip[2]-base[2],len=Math.hypot(dx,dz)||1;
-    const px=-dz/len,pz=dx/len;
-    const mid=[(base[0]+tip[0])*0.5+Math.cos(phase)*width*0.18,(base[1]+tip[1])*0.5+0.018,(base[2]+tip[2])*0.5+Math.sin(phase)*width*0.18];
-    const left=[mid[0]+px*width,mid[1]+0.012,mid[2]+pz*width];
-    const right=[mid[0]-px*width,mid[1]-0.012,mid[2]-pz*width];
-    tri(base,left,tip);tri(tip,right,base);tri(tip,left,base);tri(base,right,tip);
+    const dx=tip[0]-base[0],dy=tip[1]-base[1],dz=tip[2]-base[2];
+    const length=Math.hypot(dx,dy,dz)||1;
+    const axis=[dx/length,dy/length,dz/length];
+    const side=normalize(cross(axis,[Math.sin(phase),0.25,Math.cos(phase)]));
+    const up=normalize(cross(side,axis));
+    const sections=[0,0.48,1];
+    const centers=sections.map(t=>[
+      base[0]+dx*t+up[0]*Math.sin(Math.PI*t)*width*0.20,
+      base[1]+dy*t+up[1]*Math.sin(Math.PI*t)*width*0.20,
+      base[2]+dz*t+up[2]*Math.sin(Math.PI*t)*width*0.20,
+    ]);
+    const widths=[0,width,0];
+    const left=centers.map((p,i)=>p.map((v,k)=>v+side[k]*widths[i]));
+    const right=centers.map((p,i)=>p.map((v,k)=>v-side[k]*widths[i]));
+    const front=normalize(cross(axis,side));
+    for(let i=0;i<2;i++){
+      const a=left[i],b=right[i],c=left[i+1],d=right[i+1];
+      const midNormal=normalize([front[0]+up[0]*0.45,front[1]+up[1]*0.45,front[2]+up[2]*0.45]);
+      smoothTri(a,front,b,front,c,midNormal);smoothTri(b,front,d,midNormal,c,midNormal);
+      const back=front.map(v=>-v),backMid=midNormal.map(v=>-v);
+      smoothTri(c,back,b,back,a,back);smoothTri(c,backMid,d,backMid,b,back);
+    }
   };
   const canopyBlob=(center:number[],radii:number[],phase:number)=>{
     const lat=4,lon=8,points:number[][]=[],normals:number[][]=[];
@@ -345,21 +363,18 @@ function buildTreeGeometry(): Float32Array {
       const end=[center[0]+Math.cos(angle)*length,y+length*(0.34+(j%2)*0.08),center[2]+Math.sin(angle)*length];
       const mid=[center[0]+Math.cos(angle)*length*0.52,y+length*0.18,center[2]+Math.sin(angle)*length*0.52];
       tube(center,mid,0.027-tier*0.002,0.014-tier*0.001,5);tube(mid,end,0.014-tier*0.001,0.0035,4);
-      const leafBase=[mid[0]+(end[0]-mid[0])*0.72,mid[1]+(end[1]-mid[1])*0.72,mid[2]+(end[2]-mid[2])*0.72];
-      for(let l=0;l<1;l++){
-        const phase=angle+(l===0?0.85:-0.85)+tier*0.73;
-        leaf(leafBase,[leafBase[0]+Math.cos(phase)*0.085,leafBase[1]+0.045,leafBase[2]+Math.sin(phase)*0.085],0.026,phase);
-      }
-      for(let l=0;l<2;l++){
-        const phase=angle+l*Math.PI*2/3+tier*0.61;
-        leaf(end,[end[0]+Math.cos(phase)*0.095,end[1]+0.055,end[2]+Math.sin(phase)*0.095],0.032,phase);
+      const leafBase=[mid[0]+(end[0]-mid[0])*0.68,mid[1]+(end[1]-mid[1])*0.68,mid[2]+(end[2]-mid[2])*0.68];
+      const clusterCenter=[end[0],end[1]+0.018,end[2]];
+      // Small irregular clusters follow the branch direction instead of forming round balls.
+      for(let l=0;l<3;l++){
+        const phase=angle+l*Math.PI*2/3+tier*0.73;
+        const spread=0.052+(l%2)*0.012;
+        leaf(leafBase,[leafBase[0]+Math.cos(phase)*spread,leafBase[1]+0.055,leafBase[2]+Math.sin(phase)*spread],0.022,phase);
+        leaf(clusterCenter,[clusterCenter[0]+Math.cos(phase)*0.078,clusterCenter[1]+0.038+(l===1?0.018:0),clusterCenter[2]+Math.sin(phase)*0.078],0.027,phase+0.4);
       }
     }
   }
-  // Rounded overlapping foliage masses soften the crown silhouette and shade smoothly.
-  canopyBlob([-0.15,0.67,0.08],[0.20,0.21,0.19],0.4);
-  canopyBlob([0.15,0.73,-0.10],[0.21,0.22,0.19],1.7);
-  canopyBlob([0.01,0.86,0.03],[0.17,0.18,0.17],2.6);
+  // The crown is made only from visible branches and leaf clusters; no spherical canopy fill.
   return new Float32Array(out);
 }
 
@@ -438,6 +453,34 @@ function multiply(a: Float32Array, b: Float32Array): Float32Array {
 
 const MODE: Record<TerrainViewMode, number> = { world: 0, "first-person": 0, shaded: 0, elevation: 1, slope: 2, normals: 3, wireframe: 4, hydrology: 5 };
 
+const VEGETATION_BIN_SIZE=0.08;
+function buildInstanceSpatialBins(data:Float32Array,start=0,end=data.length):Map<string,number[]>{
+  const bins=new Map<string,number[]>();
+  for(let offset=start;offset<end;offset+=6){
+    const key=Math.floor(data[offset]/VEGETATION_BIN_SIZE)+":"+Math.floor(data[offset+2]/VEGETATION_BIN_SIZE);
+    const bucket=bins.get(key);
+    if(bucket)bucket.push(offset);else bins.set(key,[offset]);
+  }
+  return bins;
+}
+function collectVisibleInstances(
+  data:Float32Array,bins:Map<string,number[]>,focus:number[],radius:number,target:Float32Array,writeOffset=0,
+):number{
+  const minX=Math.floor((focus[0]-radius)/VEGETATION_BIN_SIZE),maxX=Math.floor((focus[0]+radius)/VEGETATION_BIN_SIZE);
+  const minZ=Math.floor((focus[2]-radius)/VEGETATION_BIN_SIZE),maxZ=Math.floor((focus[2]+radius)/VEGETATION_BIN_SIZE);
+  const radiusSquared=radius*radius;
+  let cursor=writeOffset;
+  for(let bz=minZ;bz<=maxZ;bz++)for(let bx=minX;bx<=maxX;bx++){
+    const bucket=bins.get(bx+":"+bz);if(!bucket)continue;
+    for(const source of bucket){
+      const dx=data[source]-focus[0],dz=data[source+2]-focus[2];
+      if(dx*dx+dz*dz>radiusSquared)continue;
+      for(let j=0;j<6;j++)target[cursor++]=data[source+j];
+    }
+  }
+  return cursor;
+}
+
 interface VolumeLodGpu {readonly vao:WebGLVertexArrayObject;readonly indexBuffer:WebGLBuffer;readonly chunks:readonly VolumeMeshChunk[];readonly indexCount:number}
 
 export class TerrainPreviewRenderer {
@@ -471,8 +514,10 @@ export class TerrainPreviewRenderer {
   private treeCount = 0;
   private treeInstanceData = new Float32Array(0);
   private treeVisibleData = new Float32Array(0);
+  private treeSpatialBins = new Map<string,number[]>();
   private groundInstanceData = new Float32Array(0);
   private groundVisibleData = new Float32Array(0);
+  private groundSpatialBins:Map<string,number[]>[]=[new Map(),new Map(),new Map(),new Map()];
   private renderRequest = 0;
   private waterVertexCount = 0;
   private maximumAccumulation = 1;
@@ -700,7 +745,9 @@ export class TerrainPreviewRenderer {
   setVegetation(instances: readonly VegetationInstance[]): void {
     const data=new Float32Array(instances.length*6);
     for(let i=0;i<instances.length;i++){const item=instances[i],offset=i*6;data[offset]=item.x;data[offset+1]=item.y;data[offset+2]=item.z;data[offset+3]=item.height;data[offset+4]=item.tint;data[offset+5]=item.species;}
-    this.treeCount=instances.length;this.treeInstanceData=data;this.treeVisibleData=new Float32Array(data.length);this.gl.bindBuffer(this.gl.ARRAY_BUFFER,this.treeInstanceBuffer);this.gl.bufferData(this.gl.ARRAY_BUFFER,data,this.gl.STATIC_DRAW);
+    this.treeCount=instances.length;this.treeInstanceData=data;this.treeVisibleData=new Float32Array(data.length);
+    this.treeSpatialBins=buildInstanceSpatialBins(data);
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER,this.treeInstanceBuffer);this.gl.bufferData(this.gl.ARRAY_BUFFER,data,this.gl.STATIC_DRAW);
   }
 
   setGroundCover(instances: readonly GroundCoverInstance[]): void {
@@ -716,6 +763,10 @@ export class TerrainPreviewRenderer {
       }
     }
     this.groundInstanceData=data;this.groundVisibleData=new Float32Array(data.length);
+    for(let kind=0;kind<4;kind++){
+      const start=this.groundKindStarts[kind]*6,end=start+this.groundKindCounts[kind]*6;
+      this.groundSpatialBins[kind]=buildInstanceSpatialBins(data,start,end);
+    }
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER,this.groundInstanceBuffer);
     this.gl.bufferData(this.gl.ARRAY_BUFFER,data,this.gl.STATIC_DRAW);
   }
@@ -964,12 +1015,7 @@ export class TerrainPreviewRenderer {
     const treeRadius=exploring?0.28:1.18;
     const groundRadius=exploring?0.20:(this.distance<this.fitDistance*0.65?1.15:0.82);
     const treeRadiusSquared=treeRadius*treeRadius,groundRadiusSquared=groundRadius*groundRadius;
-    let treeCursor=0;
-    for(let i=0;i<this.treeCount;i++){
-      const source=i*6,dx=this.treeInstanceData[source]-focus[0],dz=this.treeInstanceData[source+2]-focus[2];
-      if(dx*dx+dz*dz>treeRadiusSquared)continue;
-      for(let j=0;j<6;j++)this.treeVisibleData[treeCursor++]=this.treeInstanceData[source+j];
-    }
+    const treeCursor=collectVisibleInstances(this.treeInstanceData,this.treeSpatialBins,focus,treeRadius,this.treeVisibleData);
     const treeDrawCount=treeCursor/6;
     gl.bindBuffer(gl.ARRAY_BUFFER,this.treeInstanceBuffer);
     gl.bufferSubData(gl.ARRAY_BUFFER,0,this.treeVisibleData.subarray(0,treeCursor));
@@ -977,13 +1023,9 @@ export class TerrainPreviewRenderer {
     let groundCursor=0;
     for(let kind=0;kind<4;kind++){
       visibleStarts[kind]=groundCursor/6;
-      const start=this.groundKindStarts[kind]*6,end=start+this.groundKindCounts[kind]*6;
-      for(let source=start;source<end;source+=6){
-        const dx=this.groundInstanceData[source]-focus[0],dz=this.groundInstanceData[source+2]-focus[2];
-        if(dx*dx+dz*dz>groundRadiusSquared)continue;
-        for(let j=0;j<6;j++)this.groundVisibleData[groundCursor++]=this.groundInstanceData[source+j];
-        visibleCounts[kind]++;
-      }
+      const next=collectVisibleInstances(this.groundInstanceData,this.groundSpatialBins[kind],focus,groundRadius,this.groundVisibleData,groundCursor);
+      visibleCounts[kind]=(next-groundCursor)/6;
+      groundCursor=next;
     }
     gl.bindBuffer(gl.ARRAY_BUFFER,this.groundInstanceBuffer);
     gl.bufferSubData(gl.ARRAY_BUFFER,0,this.groundVisibleData.subarray(0,groundCursor));
