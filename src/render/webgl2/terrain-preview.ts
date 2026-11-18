@@ -648,7 +648,7 @@ export class TerrainPreviewRenderer {
       data[offset]=item.x;data[offset+1]=item.y;data[offset+2]=item.z;
       data[offset+3]=item.scale;data[offset+4]=item.tint;data[offset+5]=item.kind;
     }
-    this.groundCount=instances.length;this.groundInstanceData=data;this.groundVisibleData=new Float32Array(data.length);this.instanceBuffersCulled=false;
+    this.groundCount=instances.length;this.groundInstanceData=data;this.groundVisibleData=new Float32Array(data.length);
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER,this.groundInstanceBuffer);
     this.gl.bufferData(this.gl.ARRAY_BUFFER,data,this.gl.STATIC_DRAW);
   }
