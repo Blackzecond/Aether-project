@@ -753,6 +753,9 @@ export class TerrainPreviewRenderer {
     this.treeInstanceData=data;this.treeVisibleData=new Float32Array(data.length);
     this.treeMidVisibleData=new Float32Array(data.length);this.treeLowVisibleData=new Float32Array(data.length);
     this.treeSpatialBins=buildInstanceSpatialBins(data);
+    for(const buffer of [this.treeInstanceBuffer,this.treeMidInstanceBuffer,this.treeLowInstanceBuffer]){
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER,buffer);this.gl.bufferData(this.gl.ARRAY_BUFFER,data.length*Float32Array.BYTES_PER_ELEMENT,this.gl.DYNAMIC_DRAW);
+    }
   }
 
   setGroundCover(instances: readonly GroundCoverInstance[]): void {
@@ -1022,7 +1025,7 @@ export class TerrainPreviewRenderer {
     const treeCursors=collectVisibleTreeLods(this.treeInstanceData,this.treeSpatialBins,focus,treeRadius,this.treeVisibleData,this.treeMidVisibleData,this.treeLowVisibleData,exploring?0.12:0.22,exploring?0.22:0.48);
     const treeDrawCounts=treeCursors.map(cursor=>cursor/6);
     const treeBuffers=[this.treeInstanceBuffer,this.treeMidInstanceBuffer,this.treeLowInstanceBuffer],treeData=[this.treeVisibleData,this.treeMidVisibleData,this.treeLowVisibleData];
-    for(let lod=0;lod<3;lod++){gl.bindBuffer(gl.ARRAY_BUFFER,treeBuffers[lod]);gl.bufferData(gl.ARRAY_BUFFER,treeData[lod].subarray(0,treeCursors[lod]),gl.DYNAMIC_DRAW);}
+    for(let lod=0;lod<3;lod++){gl.bindBuffer(gl.ARRAY_BUFFER,treeBuffers[lod]);if(treeCursors[lod]>0)gl.bufferSubData(gl.ARRAY_BUFFER,0,treeData[lod].subarray(0,treeCursors[lod]));}
     const visibleStarts=[0,0,0,0],visibleCounts=[0,0,0,0];
     let groundCursor=0;
     for(let kind=0;kind<4;kind++){
