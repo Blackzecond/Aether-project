@@ -84,7 +84,7 @@ export function generateVegetation(field:Heightfield,seed:number,rivers?:RiverNe
       :(variety<0.58?0:variety<0.84?1:2);
     const ageRoll=hash(seed+83,gx,gz);
     // A stand has a few mature canopy trees and many shorter mid-storey trees.
-    const canopyHeight=0.014+Math.pow(ageRoll,1.62)*0.042;
+    const canopyHeight=0.010+Math.pow(ageRoll,1.28)*0.092;
     const slopeLean=1.0-Math.min(0.18,surface.slope*0.16);
     trees.push({
       x,y:surface.elevation+0.00008,z,
@@ -97,11 +97,11 @@ export function generateVegetation(field:Heightfield,seed:number,rivers?:RiverNe
   // Sub-cell sampling plus reservoir sampling prevents scan-order bias.
   // Continuous grass colour/texture is supplied by the terrain shader;
   // these instances add readable blades and understory in close views.
-  const coverLimit=40000;
+  const coverLimit=22000;
   let coverCandidates=0;
-  for(let gz=2;gz<field.height-2;gz+=0.42)for(let gx=2;gx<field.width-2;gx+=0.42){
+  for(let gz=2;gz<field.height-2;gz+=0.54)for(let gx=2;gx<field.width-2;gx+=0.54){
     const forest=forestAt(gx,gz),meadow=1-forest;
-    const jx=(hash(seed+131,Math.floor(gx*10),Math.floor(gz*10))-0.5)*0.72;
+    const jx=(hash(seed+131,Math.floor(gx*8),Math.floor(gz*8))-0.5)*0.72;
     const jz=(hash(seed+149,Math.floor(gx*10),Math.floor(gz*10))-0.5)*0.72;
     const sx=Math.max(1,Math.min(field.width-2,gx+jx)),sz=Math.max(1,Math.min(field.height-2,gz+jz));
     const {x,z}=toWorld(sx,sz);
