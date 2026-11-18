@@ -905,7 +905,7 @@ export class TerrainPreviewRenderer {
     }
     const treeDrawCount=treeCursor/6;
     gl.bindBuffer(gl.ARRAY_BUFFER,this.treeInstanceBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER,this.treeVisibleData.subarray(0,treeCursor),gl.DYNAMIC_DRAW);
+    gl.bufferSubData(gl.ARRAY_BUFFER,0,this.treeVisibleData.subarray(0,treeCursor));
     let groundCursor=0;
     for(let i=0;i<this.groundCount;i++){
       const source=i*6,dx=this.groundInstanceData[source]-camera[0],dz=this.groundInstanceData[source+2]-camera[2];
@@ -914,7 +914,7 @@ export class TerrainPreviewRenderer {
     }
     const groundDrawCount=groundCursor/6;
     gl.bindBuffer(gl.ARRAY_BUFFER,this.groundInstanceBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER,this.groundVisibleData.subarray(0,groundCursor),gl.DYNAMIC_DRAW);
+    gl.bufferSubData(gl.ARRAY_BUFFER,0,this.groundVisibleData.subarray(0,groundCursor));
     this.instanceBuffersCulled=true;
     if((this.mode==="world" || this.mode==="first-person") && treeDrawCount>0){
       gl.useProgram(this.treeProgram);gl.uniformMatrix4fv(this.treeMvpLocation,false,mvp);
