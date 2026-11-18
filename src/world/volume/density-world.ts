@@ -1,4 +1,4 @@
-import { createRandom, hash32 } from "../../core/random";
+import { hash32 } from "../../core/random";
 import { createHeightfield, sampleElevation, type Heightfield } from "../fields/heightfield";
 import { DEFAULT_WORLD_BOUNDS } from "../coordinates";
 import { generateTerrain } from "../terrain/landforms";
@@ -23,8 +23,6 @@ export interface DensityWorld {
 export interface DensityResolution {readonly width:number;readonly height:number;readonly depth:number}
 const clamp=(v:number,a:number,b:number):number=>Math.max(a,Math.min(b,v));
 const mix=(a:number,b:number,t:number):number=>a+(b-a)*t;
-const smoothMax=(a:number,b:number,k:number):number=>{const h=Math.max(k-Math.abs(a-b),0)/k;return Math.max(a,b)+h*h*k*0.25;};
-const smoothMin=(a:number,b:number,k:number):number=>-smoothMax(-a,-b,k);
 function latticeHash(x:number,y:number,z:number,seed:number):number{
   return hash32(seed^Math.imul(x,0x8da6b343)^Math.imul(y,0xd8163841)^Math.imul(z,0xcb1ab31f))/4294967295;
 }
@@ -51,13 +49,6 @@ function worley3(x:number,y:number,z:number,seed:number):number{
   }
   return Math.sqrt(nearest);
 }
-interface Cave{ax:number;ay:number;az:number;bx:number;by:number;bz:number;radius:number}
-function capsuleDistance(x:number,y:number,z:number,c:Cave):number{
-  const abx=c.bx-c.ax,aby=c.by-c.ay,abz=c.bz-c.az,apx=x-c.ax,apy=y-c.ay,apz=z-c.az;
-  const t=clamp((apx*abx+apy*aby+apz*abz)/(abx*abx+aby*aby+abz*abz||1),0,1);
-  return Math.hypot(apx-abx*t,apy-aby*t,apz-abz*t)-c.radius;
-}
-
 /** Signed-density terrain with smooth SDF unions, 3D domain warping and Surface Nets extraction. */
 export function generateDensityWorld(recipe:TerrainRecipe,resolution:DensityResolution={width:96,height:56,depth:96}):DensityWorld{
   const base=generateTerrain(recipe).heightfield,{width,height,depth}=resolution;
@@ -79,6 +70,7 @@ export function generateDensityWorld(recipe:TerrainRecipe,resolution:DensityReso
       for(let x=0;x<width;x++){
         const wx=origin.x+x*voxelSize.x,baseHeight=plane[z*width+x];
         const baseDensity=baseHeight-wy;
+        const rockMask=clamp((baseHeight-0.055)/0.22,0,1);
         let erosion=0;
         // High-frequency 3D weathering is evaluated only in a narrow band
         // around the zero surface; deep solid and empty samples need no detail.
