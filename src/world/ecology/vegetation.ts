@@ -60,7 +60,7 @@ export function generateVegetation(field:Heightfield,seed:number,rivers?:RiverNe
 
   // Candidate spacing is about 16–24 m, followed by a small Poisson-like
   // rejection pass. This avoids the old 8 m grid that made crowns overlap.
-  const cellSize=0.0125;
+  const cellSize=0.0065;
   const occupied=new Map<string,Array<{x:number;z:number}>>();
   for(let gz=3;gz<field.height-3&&trees.length<2600;gz+=2)for(let gx=3;gx<field.width-3&&trees.length<2600;gx+=2){
     const forest=forestAt(gx,gz);
@@ -72,7 +72,7 @@ export function generateVegetation(field:Heightfield,seed:number,rivers?:RiverNe
     if(water[Math.round(sz)*field.width+Math.round(sx)]!==0)continue;
     const bx=Math.floor(x/cellSize),bz=Math.floor(z/cellSize);
     let crowded=false;
-    for(let dz=-1;dz<=1&&!crowded;dz++)for(let dx=-1;dx<=1&&!crowded;dx++){
+    for(let dz=-2;dz<=2&&!crowded;dz++)for(let dx=-2;dx<=2&&!crowded;dx++){
       for(const other of occupied.get((bx+dx)+":"+(bz+dz))??[]){
         const minDistance=0.009+hash(seed+619,gx,gz)*0.004;
         if((x-other.x)**2+(z-other.z)**2<minDistance*minDistance){crowded=true;break;}
