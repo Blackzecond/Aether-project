@@ -88,12 +88,12 @@ export function buildProceduralTreeGeometry(detail: TreeGeometryDetail = "high")
   };
 
   const high=detail==="high",medium=detail==="medium";
-  const primaryCount=high?8:medium?7:6;
-  const secondaryPerPrimary=high?4:medium?3:1;
-  const twigPerSecondary=high?3:medium?2:1;
-  const leafCount=high?260:medium?120:42;
-  const branchRadial=high?7:5;
-  const branchSegments=high?5:3;
+  const primaryCount=high?7:medium?7:6;
+  const secondaryPerPrimary=high?3:medium?2:1;
+  const twigPerSecondary=high?2:medium?1:1;
+  const leafCount=high?150:medium?72:28;
+  const branchRadial=high?5:4;
+  const branchSegments=high?3:2;
 
   // A subtly leaning trunk with a broad, grounded root flare.
   addCurvedBranch([0,0,0],[0.012,1,0.006],0.068,0.006,[0.014,0,0.008],12,9);
