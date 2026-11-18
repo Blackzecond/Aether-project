@@ -62,7 +62,7 @@ export function generateVegetation(field:Heightfield,seed:number,rivers?:RiverNe
   // rejection pass. This avoids the old 8 m grid that made crowns overlap.
   const cellSize=0.0125;
   const occupied=new Map<string,Array<{x:number;z:number}>>();
-  for(let gz=3;gz<field.height-3;gz+=2)for(let gx=3;gx<field.width-3;gx+=2){
+  for(let gz=3;gz<field.height-3&&trees.length<2600;gz+=2)for(let gx=3;gx<field.width-3&&trees.length<2600;gx+=2){
     const forest=forestAt(gx,gz);
     if(forest<0.14||hash(seed+601,gx,gz)>0.18+forest*0.68)continue;
     const jx=(hash(seed+31,gx,gz)-0.5)*1.55,jz=(hash(seed+47,gx,gz)-0.5)*1.55;
@@ -90,7 +90,7 @@ export function generateVegetation(field:Heightfield,seed:number,rivers?:RiverNe
 
   // Dense but low ground cover: grass dominates open meadows, ferns the
   // shaded understory, and moss the damp margins. The water corridor stays clear.
-  for(let gz=2;gz<field.height-2;gz++)for(let gx=2;gx<field.width-2;gx++){
+  for(let gz=2;gz<field.height-2&&groundCover.length<18000;gz++)for(let gx=2;gx<field.width-2&&groundCover.length<18000;gx++){
     const forest=forestAt(gx,gz);
     const jx=(hash(seed+131,gx,gz)-0.5)*0.85,jz=(hash(seed+149,gx,gz)-0.5)*0.85;
     const sx=Math.max(1,Math.min(field.width-2,gx+jx)),sz=Math.max(1,Math.min(field.height-2,gz+jz));
