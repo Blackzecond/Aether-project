@@ -143,7 +143,7 @@ void main() {
 }`;
 
 
-const treeVertexSource = "#version 300 es\nprecision highp float;\nlayout(location=0) in vec3 aPosition;\nlayout(location=1) in vec3 aNormal;\nlayout(location=2) in vec3 iOffset;\nlayout(location=3) in float iScale;\nlayout(location=4) in float iTint;\nuniform mat4 uMvp;\nout vec3 vNormal;\nout float vHeight;\nout float vTint;\nvoid main(){vec3 world=aPosition*iScale+iOffset;vNormal=aNormal;vHeight=aPosition.y;vTint=iTint;gl_Position=uMvp*vec4(world,1.0);}";
+const treeVertexSource = "#version 300 es\nprecision highp float;\nlayout(location=0) in vec3 aPosition;\nlayout(location=1) in vec3 aNormal;\nlayout(location=2) in vec3 iOffset;\nlayout(location=3) in float iScale;\nlayout(location=4) in float iTint;\nuniform mat4 uMvp;\nout vec3 vNormal;\nout float vHeight;\nout float vTint;\nvoid main(){float angle=iTint*6.2831853;mat2 rotation=mat2(cos(angle),-sin(angle),sin(angle),cos(angle));vec3 local=aPosition*iScale;local.xz=rotation*local.xz;local.xz*=0.82+fract(iTint*19.17)*0.34;vec3 world=local+iOffset;vNormal=aNormal;vHeight=aPosition.y;vTint=iTint;gl_Position=uMvp*vec4(world,1.0);}";
 const treeFragmentSource = "#version 300 es\nprecision highp float;\nin vec3 vNormal;in float vHeight;in float vTint;out vec4 outColor;\nvoid main(){vec3 n=normalize(vNormal);vec3 light=normalize(vec3(-0.45,0.82,0.36));float diffuse=max(dot(n,light),0.0);vec3 bark=mix(vec3(0.19,0.13,0.085),vec3(0.34,0.23,0.13),vTint*0.55);vec3 leaf=mix(vec3(0.055,0.19,0.105),vec3(0.20,0.34,0.16),vTint*0.72);vec3 color=vHeight<0.38?bark:leaf;color*=0.42+diffuse*0.72;outColor=vec4(color,1.0);}";
 const groundVertexSource = `#version 300 es
 precision highp float;
