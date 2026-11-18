@@ -62,7 +62,7 @@ export function generateVegetation(field:Heightfield,seed:number,rivers?:RiverNe
   // rejection pass. This avoids the old 8 m grid that made crowns overlap.
   const cellSize=0.0065;
   const occupied=new Map<string,Array<{x:number;z:number}>>();
-  for(let gz=3;gz<field.height-3&&trees.length<2600;gz+=2)for(let gx=3;gx<field.width-3&&trees.length<2600;gx+=2){
+  for(let gz=3;gz<field.height-3;gz+=3)for(let gx=3;gx<field.width-3;gx+=3){
     const forest=forestAt(gx,gz);
     if(forest<0.14||hash(seed+601,gx,gz)>0.18+forest*0.68)continue;
     const jx=(hash(seed+31,gx,gz)-0.5)*1.55,jz=(hash(seed+47,gx,gz)-0.5)*1.55;
@@ -85,12 +85,12 @@ export function generateVegetation(field:Heightfield,seed:number,rivers?:RiverNe
       height:0.024+hash(seed+83,gx,gz)*0.018,
       tint:hash(seed+97,gx,gz),
     });
-    if(trees.length>=2600)break;
   }
 
   // Dense but low ground cover: grass dominates open meadows, ferns the
   // shaded understory, and moss the damp margins. The water corridor stays clear.
-  for(let gz=2;gz<field.height-2&&groundCover.length<18000;gz++)for(let gx=2;gx<field.width-2&&groundCover.length<18000;gx++){
+  let coverCandidates=0;
+  for(let gz=2;gz<field.height-2;gz++)for(let gx=2;gx<field.width-2;gx++){
     const forest=forestAt(gx,gz);
     const jx=(hash(seed+131,gx,gz)-0.5)*0.85,jz=(hash(seed+149,gx,gz)-0.5)*0.85;
     const sx=Math.max(1,Math.min(field.width-2,gx+jx)),sz=Math.max(1,Math.min(field.height-2,gz+jz));
@@ -109,8 +109,13 @@ export function generateVegetation(field:Heightfield,seed:number,rivers?:RiverNe
       :kind===2?0.0010+hash(seed+181,gx,gz)*0.0012
       :kind===1?0.0018+hash(seed+181,gx,gz)*0.0015
       :0.0008+hash(seed+181,gx,gz)*0.0008;
-    groundCover.push({x,y:surface.elevation+0.00012,z,scale,tint:hash(seed+193,gx,gz),kind});
-    if(groundCover.length>=18000)break;
+    const item={x,y:surface.elevation+0.00012,z,scale,tint:hash(seed+193,gx,gz),kind};
+    coverCandidates++;
+    if(groundCover.length<18000)groundCover.push(item);
+    else{
+      const replacement=Math.floor(hash(seed+227,coverCandidates,0)*coverCandidates);
+      if(replacement<18000)groundCover[replacement]=item;
+    }
   }
   return{instances:trees,groundCover,diagnostics:{
     candidates:(field.width-6)*(field.height-6),trees:trees.length,groundCover:groundCover.length,
