@@ -179,69 +179,113 @@ void main(){
 }`;
 function buildGroundCoverGeometry(): Float32Array {
   const out:number[]=[];
-  const tri=(a:number[],b:number[],d:number[],kind:number)=>{
-    const ux=b[0]-a[0],uy=b[1]-a[1],uz=b[2]-a[2],vx=d[0]-a[0],vy=d[1]-a[1],vz=d[2]-a[2];
+  const tri=(a:number[],b:number[],c:number[],kind:number)=>{
+    const ux=b[0]-a[0],uy=b[1]-a[1],uz=b[2]-a[2],vx=c[0]-a[0],vy=c[1]-a[1],vz=c[2]-a[2];
     let nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;const len=Math.hypot(nx,ny,nz)||1;
     nx/=len;ny/=len;nz/=len;
-    for(const p of [a,b,d])out.push(p[0],p[1],p[2],nx,ny,nz,kind);
+    for(const p of [a,b,c])out.push(p[0],p[1],p[2],nx,ny,nz,kind);
   };
-  for(let i=0;i<9;i++){
-    const angle=i/9*Math.PI*2,dx=Math.cos(angle),dz=Math.sin(angle),px=-dz,pz=dx;
-    const width=0.055+(i%3)*0.012,height=0.62+(i%4)*0.10;
-    const baseL=[-px*width,0,-pz*width],baseR=[px*width,0,pz*width];
-    const mid=[dx*0.10,height*0.52,dz*0.10],tip=[dx*(0.18+(i%2)*0.04),height,dz*(0.18+(i%2)*0.04)];
-    tri(baseL,baseR,mid,0);tri(baseR,tip,mid,0);
-  }
-  for(let i=0;i<4;i++){
-    const angle=i/4*Math.PI*2,dx=Math.cos(angle),dz=Math.sin(angle),px=-dz,pz=dx;
-    tri([0,0,0],[dx*0.10,0.08,dz*0.10],[dx*0.82,0.72,dz*0.82],1);
-    for(let j=1;j<=3;j++){
-      const t=j/4,cx=dx*t*0.72,cz=dz*t*0.72,cy=0.08+Math.sin(t*Math.PI)*0.30,leaf=0.18*(1-t*0.48);
-      tri([cx,cy,cz],[cx+px*leaf,cy+0.05,cz+pz*leaf],[cx+dx*0.09,cy+0.08,cz+dz*0.09],1);
-      tri([cx,cy,cz],[cx-px*leaf,cy+0.05,cz-pz*leaf],[cx+dx*0.09,cy+0.08,cz+dz*0.09],1);
+  const blade=(angle:number,width:number,height:number,bend:number,kind:number)=>{
+    const dx=Math.cos(angle),dz=Math.sin(angle),px=-dz,pz=dx,steps=4;
+    for(let i=0;i<steps;i++){
+      const t0=i/steps,t1=(i+1)/steps;
+      const curve=(t:number)=>bend*t*t;
+      const w0=width*(1-t0*0.88),w1=width*(1-t1*0.88);
+      const y0=height*t0,y1=height*t1;
+      const cx0=dx*curve(t0),cz0=dz*curve(t0),cx1=dx*curve(t1),cz1=dz*curve(t1);
+      const a=[cx0-px*w0,y0,cz0-pz*w0],b=[cx0+px*w0,y0,cz0+pz*w0];
+      const c=[cx1+px*w1,y1,cz1+pz*w1],d=[cx1-px*w1,y1,cz1-pz*w1];
+      tri(a,b,c,kind);tri(a,c,d,kind);
+      tri(c,b,a,kind);tri(d,c,a,kind);
     }
+  };
+  // Grass blades are curved, tapered strips, with varied azimuth and lean.
+  for(let i=0;i<12;i++){
+    const a=i*2.39996;
+    blade(a,0.035+(i%3)*0.009,0.62+(i%5)*0.105,0.10+(i%4)*0.055,0);
   }
-  const mossRing:number[][]=[];
-  for(let i=0;i<7;i++){const a=i/7*Math.PI*2,r=0.62+(i%2)*0.08;mossRing.push([Math.cos(a)*r,0.10+(i%3)*0.025,Math.sin(a)*r]);}
-  for(let i=0;i<mossRing.length;i++)tri([0,0.30,0],mossRing[i],mossRing[(i+1)%mossRing.length],2);
-  const top=[0.05,0.48,0.02],bottom=[-0.03,0.02,-0.02];
-  const ring=[[0.62,0.20,0.05],[0.25,0.17,0.58],[-0.48,0.19,0.42],[-0.60,0.16,-0.28],[-0.12,0.22,-0.62],[0.48,0.16,-0.40]];
-  for(let i=0;i<ring.length;i++){tri(top,ring[i],ring[(i+1)%ring.length],3);tri(bottom,ring[(i+1)%ring.length],ring[i],3);}
+  // Fern fronds: arched stems with paired leaflets, not solid triangular fans.
+  for(let i=0;i<6;i++){
+    const a=i*Math.PI/3,dx=Math.cos(a),dz=Math.sin(a),px=-dz,pz=dx;
+    const stem=(t:number)=>[dx*t*0.62,0.05+Math.sin(t*Math.PI)*0.24+t*0.25,dz*t*0.62];
+    for(let j=0;j<5;j++){
+      const t=0.12+j*0.16,p=stem(t),q=stem(Math.min(1,t+0.12)),leaf=0.10*(1-t*0.45);
+      tri(p,[p[0]+px*leaf,p[1]+0.035,p[2]+pz*leaf],q,1);
+      tri(p,[p[0]-px*leaf,p[1]+0.035,p[2]-pz*leaf],q,1);
+    }
+    const p=stem(1),q=stem(0.78);tri(q,[p[0],p[1]+0.10,p[2]],p,1);
+  }
+  // Moss is a low, softly irregular ground patch.
+  const center=[0,0.045,0],ring:number[][]=[];
+  for(let i=0;i<12;i++){const a=i/12*Math.PI*2,r=0.42+(i%3)*0.045;ring.push([Math.cos(a)*r,0.035+(i%2)*0.018,Math.sin(a)*r]);}
+  for(let i=0;i<ring.length;i++)tri(center,ring[i],ring[(i+1)%ring.length],2);
+  // Small grounded stones with a faceted, low profile.
+  const rockRing=[[0.52,0.13,0.05],[0.26,0.16,0.43],[-0.34,0.12,0.40],[-0.53,0.11,-0.20],[-0.10,0.18,-0.48],[0.38,0.13,-0.36]];
+  const top=[0.02,0.25,0.01],bottom=[-0.02,0.015,-0.01];
+  for(let i=0;i<rockRing.length;i++){tri(top,rockRing[i],rockRing[(i+1)%rockRing.length],3);tri(bottom,rockRing[(i+1)%rockRing.length],rockRing[i],3);}
   return new Float32Array(out);
 }
 
 function buildTreeGeometry(): Float32Array {
-  const out: number[] = [];
-  const tri = (a:number[],b:number[],d:number[]) => {
-    const ux=b[0]-a[0],uy=b[1]-a[1],uz=b[2]-a[2],vx=d[0]-a[0],vy=d[1]-a[1],vz=d[2]-a[2];
-    let nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;const len=Math.hypot(nx,ny,nz)||1;nx/=len;ny/=len;nz/=len;
-    for(const p of [a,b,d])out.push(p[0],p[1],p[2],nx,ny,nz);
+  const out:number[]=[];
+  const tri=(a:number[],b:number[],c:number[])=>{
+    const ux=b[0]-a[0],uy=b[1]-a[1],uz=b[2]-a[2],vx=c[0]-a[0],vy=c[1]-a[1],vz=c[2]-a[2];
+    let nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;const len=Math.hypot(nx,ny,nz)||1;
+    nx/=len;ny/=len;nz/=len;
+    for(const p of [a,b,c])out.push(p[0],p[1],p[2],nx,ny,nz);
   };
-  const cylinder=(bottom:number,top:number,radius:number,segments=8) => {
+  const tube=(a:number[],b:number[],ra:number,rb:number,segments=6)=>{
+    const axis=[b[0]-a[0],b[1]-a[1],b[2]-a[2]],length=Math.hypot(...axis)||1;
+    const ux=axis[0]/length,uy=axis[1]/length,uz=axis[2]/length;
+    const ref=Math.abs(uy)>0.92?[1,0,0]:[0,1,0];
+    let vx=uy*ref[2]-uz*ref[1],vy=uz*ref[0]-ux*ref[2],vz=ux*ref[1]-uy*ref[0];
+    const vl=Math.hypot(vx,vy,vz)||1;vx/=vl;vy/=vl;vz/=vl;
+    const wx=uy*vz-uz*vy,wy=uz*vx-ux*vz,wz=ux*vy-uy*vx;
     for(let i=0;i<segments;i++){
-      const a=i/segments*Math.PI*2,b=(i+1)/segments*Math.PI*2;
-      const p1=[Math.cos(a)*radius,bottom,Math.sin(a)*radius],p2=[Math.cos(b)*radius,bottom,Math.sin(b)*radius];
-      const p3=[Math.cos(a)*radius*0.58,top,Math.sin(a)*radius*0.58],p4=[Math.cos(b)*radius*0.58,top,Math.sin(b)*radius*0.58];
-      tri(p1,p3,p2);tri(p2,p3,p4);
+      const p=i/segments*Math.PI*2,q=(i+1)/segments*Math.PI*2;
+      const ring=(center:number[],r:number,t:number)=>[center[0]+(vx*Math.cos(t)+wx*Math.sin(t))*r,center[1]+(vy*Math.cos(t)+wy*Math.sin(t))*r,center[2]+(vz*Math.cos(t)+wz*Math.sin(t))*r];
+      const a0=ring(a,ra,p),a1=ring(a,ra,q),b0=ring(b,rb,p),b1=ring(b,rb,q);
+      tri(a0,b0,a1);tri(a1,b0,b1);
     }
   };
-  const ellipsoid=(cx:number,cy:number,cz:number,rx:number,ry:number,rz:number,segments=9,rings=6)=>{
-    for(let y=0;y<rings;y++){
-      const v0=-Math.PI/2+y/rings*Math.PI,v1=-Math.PI/2+(y+1)/rings*Math.PI;
-      for(let x=0;x<segments;x++){
-        const a=x/segments*Math.PI*2,b=(x+1)/segments*Math.PI*2;
-        const p=(v:number,t:number)=>[cx+Math.cos(v)*Math.cos(t)*rx,cy+Math.sin(v)*ry,cz+Math.cos(v)*Math.sin(t)*rz];
-        tri(p(v0,a),p(v1,a),p(v1,b));tri(p(v0,a),p(v1,b),p(v0,b));
+  const leaf=(base:number[],tip:number[],width:number,phase:number)=>{
+    const dx=tip[0]-base[0],dy=tip[1]-base[1],dz=tip[2]-base[2],len=Math.hypot(dx,dy,dz)||1;
+    const px=-dz/len,py=0,pz=dx/len;
+    const mid=[(base[0]+tip[0])*0.5+Math.cos(phase)*width*0.18,(base[1]+tip[1])*0.5+0.018,(base[2]+tip[2])*0.5+Math.sin(phase)*width*0.18];
+    const left=[mid[0]+px*width,mid[1]+py*width,mid[2]+pz*width];
+    const right=[mid[0]-px*width,mid[1]-py*width,mid[2]-pz*width];
+    tri(base,left,mid);tri(left,tip,mid);tri(tip,right,mid);tri(right,base,mid);
+    tri(mid,left,base);tri(mid,tip,left);tri(mid,right,tip);tri(mid,base,right);
+  };
+  // A tapered trunk and tiered, asymmetrical branches form the tree silhouette.
+  const trunk0=[0,0,0],trunk1=[0.018,0.36,-0.008],trunk2=[-0.012,0.70,0.012],trunk3=[0.015,1,0];
+  tube(trunk0,trunk1,0.075,0.052,8);tube(trunk1,trunk2,0.052,0.029,7);tube(trunk2,trunk3,0.029,0.008,6);
+  for(let tier=0;tier<7;tier++){
+    const y=0.28+tier*0.095;
+    const center=[Math.sin(tier*1.7)*0.018,y,Math.cos(tier*1.3)*0.014];
+    const count=tier<3?5:4;
+    for(let j=0;j<count;j++){
+      const angle=j/count*Math.PI*2+tier*1.91;
+      const length=(0.34-tier*0.032)*(0.82+0.18*Math.sin(j*4.1+tier));
+      const end=[center[0]+Math.cos(angle)*length,y+length*(0.34+(j%2)*0.08),center[2]+Math.sin(angle)*length];
+      const mid=[center[0]+Math.cos(angle)*length*0.52,y+length*0.18,center[2]+Math.sin(angle)*length*0.52];
+      tube(center,mid,0.027-tier*0.002,0.014-tier*0.001,5);
+      tube(mid,end,0.014-tier*0.001,0.0035,4);
+      for(let k=0;k<3;k++){
+        const t=0.58+k*0.17,base=[mid[0]+(end[0]-mid[0])*t,mid[1]+(end[1]-mid[1])*t,mid[2]+(end[2]-mid[2])*t];
+        for(let l=0;l<3;l++){
+          const phase=angle+l*2.094+tier*0.73;
+          const tip=[base[0]+Math.cos(phase)*0.085,base[1]+0.045+(l%2)*0.018,base[2]+Math.sin(phase)*0.085];
+          leaf(base,tip,0.026,phase);
+        }
+      }
+      const leafBase=end;
+      for(let l=0;l<4;l++){
+        const phase=angle+l*Math.PI*0.5;
+        leaf(leafBase,[end[0]+Math.cos(phase)*0.095,end[1]+0.055,end[2]+Math.sin(phase)*0.095],0.032,phase);
       }
     }
-  };
-  cylinder(0,0.68,0.045);
-  // Several overlapping leaf masses create a rounded, irregular broadleaf crown.
-  ellipsoid(0,0.72,0,0.25,0.25,0.23);
-  ellipsoid(-0.14,0.67,0.04,0.19,0.20,0.19);
-  ellipsoid(0.15,0.70,-0.05,0.20,0.21,0.18);
-  ellipsoid(0.02,0.84,0.12,0.18,0.18,0.18);
-  ellipsoid(-0.04,0.86,-0.13,0.18,0.17,0.17);
+  }
   return new Float32Array(out);
 }
 
