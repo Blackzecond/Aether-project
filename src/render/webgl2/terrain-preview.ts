@@ -660,7 +660,7 @@ export class TerrainPreviewRenderer {
     }
     this.groundCount=instances.length;this.groundInstanceData=data;this.groundVisibleData=new Float32Array(data.length);
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER,this.groundInstanceBuffer);
-    this.gl.bufferData(this.gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);
+    this.gl.bufferData(this.gl.ARRAY_BUFFER,data,this.gl.STATIC_DRAW);
   }
 
   setTerrain(field: Heightfield): void {
