@@ -208,6 +208,22 @@ describe("world foundation v2", () => {
       && item.x >= field.bounds.minX && item.x <= field.bounds.maxX
       && item.z >= field.bounds.minZ && item.z <= field.bounds.maxZ)).toBe(true);
   });
+  it("places forest trees with deterministic natural spacing", () => {
+    const field = generateTerrain(recipe()).heightfield;
+    const first = generateVegetation(field, 91827);
+    const second = generateVegetation(field, 91827);
+    expect(first.instances).toEqual(second.instances);
+    expect(first.instances.length).toBeGreaterThan(80);
+    expect(first.instances.length).toBeLessThan(2600);
+    const sample = first.instances.slice(0, 180);
+    for (let i = 0; i < sample.length; i += 1) {
+      for (let j = i + 1; j < sample.length; j += 1) {
+        const dx = sample[i].x - sample[j].x;
+        const dz = sample[i].z - sample[j].z;
+        expect(Math.hypot(dx, dz)).toBeGreaterThan(0.008);
+      }
+    }
+  });
   it("isolates subsystem seeds", () => {
     expect(deriveSubsystemSeed(42, "forest")).toBe(deriveSubsystemSeed(42, "forest"));
     expect(deriveSubsystemSeed(42, "forest")).not.toBe(deriveSubsystemSeed(42, "terrain"));
