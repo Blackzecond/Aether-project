@@ -51,17 +51,11 @@ function worley3(x:number,y:number,z:number,seed:number):number{
   }
   return Math.sqrt(nearest);
 }
-interface RockMass{x:number;y:number;z:number;rx:number;ry:number;rz:number;blend:number}
 interface Cave{ax:number;ay:number;az:number;bx:number;by:number;bz:number;radius:number}
 function capsuleDistance(x:number,y:number,z:number,c:Cave):number{
   const abx=c.bx-c.ax,aby=c.by-c.ay,abz=c.bz-c.az,apx=x-c.ax,apy=y-c.ay,apz=z-c.az;
   const t=clamp((apx*abx+apy*aby+apz*abz)/(abx*abx+aby*aby+abz*abz||1),0,1);
   return Math.hypot(apx-abx*t,apy-aby*t,apz-abz*t)-c.radius;
-}
-function ellipsoidDensity(x:number,y:number,z:number,m:RockMass):number{
-  const nx=(x-m.x)/m.rx,ny=(y-m.y)/m.ry,nz=(z-m.z)/m.rz,k0=Math.hypot(nx,ny,nz);
-  const k1=Math.hypot(nx/m.rx,ny/m.ry,nz/m.rz);
-  return k1>1e-6?(1-k0)/k1:Math.min(m.rx,m.ry,m.rz);
 }
 
 /** Signed-density terrain with smooth SDF unions, 3D domain warping and Surface Nets extraction. */
@@ -70,17 +64,7 @@ export function generateDensityWorld(recipe:TerrainRecipe,resolution:DensityReso
   if(![width,height,depth].every(n=>Number.isInteger(n)&&n>=12&&n<=192))throw new Error("Density grid dimensions must be integers from 12 to 192");
   const bounds=recipe.bounds??DEFAULT_WORLD_BOUNDS,origin={x:bounds.minX,y:-0.055,z:bounds.minZ},maxY=0.92;
   const voxelSize={x:(bounds.maxX-bounds.minX)/(width-1),y:(maxY-origin.y)/(height-1),z:(bounds.maxZ-bounds.minZ)/(depth-1)};
-  const values=new Float32Array(width*height*depth),random=createRandom(recipe.seed^0x5f3759df);
-  const rocks:RockMass[]=[];
-  for(let i=0;i<13;i++){
-    const x=bounds.minX+random()*(bounds.maxX-bounds.minX),z=bounds.minZ+random()*(bounds.maxZ-bounds.minZ),ground=sampleElevation(base,x,z)*1.18,rx=0.045+random()*0.095;
-    rocks.push({x,y:ground+0.025+random()*0.11,z,rx,ry:0.045+random()*0.13,rz:0.045+random()*0.11,blend:0.035+random()*0.025});
-  }
-  const caves:Cave[]=[
-    {ax:-0.48,ay:0.23,az:-0.18,bx:-0.12,by:0.31,bz:0.05,radius:0.045},
-    {ax:0.22,ay:0.30,az:0.38,bx:0.55,by:0.35,bz:0.18,radius:0.035},
-    {ax:-0.08,ay:0.43,az:-0.52,bx:0.17,by:0.39,bz:-0.28,radius:0.028},
-  ];
+  const values=new Float32Array(width*height*depth);
   const plane=new Float32Array(width*depth);
   for(let z=0;z<depth;z++)for(let x=0;x<width;x++){
     const wx=origin.x+x*voxelSize.x,wz=origin.z+z*voxelSize.z;
@@ -95,7 +79,6 @@ export function generateDensityWorld(recipe:TerrainRecipe,resolution:DensityReso
       for(let x=0;x<width;x++){
         const wx=origin.x+x*voxelSize.x,baseHeight=plane[z*width+x];
         const baseDensity=baseHeight-wy;
-        const rockMask=clamp((baseHeight-0.055)/0.22,0,1);
         let erosion=0;
         // High-frequency 3D weathering is evaluated only in a narrow band
         // around the zero surface; deep solid and empty samples need no detail.
@@ -110,18 +93,6 @@ export function generateDensityWorld(recipe:TerrainRecipe,resolution:DensityReso
           erosion=(0.0045*(0.5-cellular)+0.0018*(0.5-fineCell)+broadNoise*0.004)*rockMask;
         }
         let density=baseDensity+erosion;
-        for(const rock of rocks){
-          if(Math.abs(wx-rock.x)<rock.rx*1.5&&Math.abs(wy-rock.y)<rock.ry*1.5&&Math.abs(wz-rock.z)<rock.rz*1.5){
-            density=smoothMax(density,ellipsoidDensity(wx,wy,wz,rock),rock.blend);
-          }
-        }
-        for(const cave of caves){
-          if(wy>=Math.min(cave.ay,cave.by)-cave.radius&&wy<=Math.max(cave.ay,cave.by)+cave.radius
-            &&wx>=Math.min(cave.ax,cave.bx)-cave.radius&&wx<=Math.max(cave.ax,cave.bx)+cave.radius
-            &&wz>=Math.min(cave.az,cave.bz)-cave.radius&&wz<=Math.max(cave.az,cave.bz)+cave.radius){
-            density=smoothMin(density,capsuleDistance(wx,wy,wz,cave),0.018);
-          }
-        }
         if(x===0||z===0||x===width-1||z===depth-1||y===0||y===height-1)density=-0.08;
         const value=Math.fround(density);values[index(x,y,z)]=value;if(value>0)occupiedSamples++;
       }
