@@ -600,7 +600,7 @@ export class TerrainPreviewRenderer {
   }
 
   setTerrain(field: Heightfield): void {
-    this.uploadTerrainMesh(field,buildHeightfieldMesh(field,1.18),false);
+    this.uploadTerrainMesh(field,buildHeightfieldMesh(field,1),false);
   }
 
   setVolumeTerrain(field: Heightfield,mesh:VolumeMesh):void {
