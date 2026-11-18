@@ -13,7 +13,7 @@ function updateLabels():void {
   for(const [id,key] of controls){const input=document.querySelector<HTMLInputElement>(`#${id}`)!;document.querySelector<HTMLOutputElement>(`#${id}-value`)!.value=Number(input.value).toFixed(key==="detailOctaves"?0:2);}
   document.querySelector<HTMLOutputElement>("#seed-value")!.value=String(recipe.seed);
 }
-interface DensityWorkerMessage {
+interface TerrainWorkerMessage {
   readonly id:number;
   readonly ok:boolean;
   readonly error?:string;
@@ -21,11 +21,11 @@ interface DensityWorkerMessage {
   readonly diagnostics?:{readonly min:number;readonly max:number;readonly mean:number;readonly variance:number;readonly slopeMean:number};
   readonly backend?:"heightfield";
 }
-const densityWorker=new Worker(new URL("./world/terrain/terrain-worker.ts",import.meta.url),{type:"module"});
+const terrainWorker=new Worker(new URL("./world/terrain/terrain-worker.ts",import.meta.url),{type:"module"});
 let requestId=0;
 let renderTimer:number|undefined;
 let latestRefreshHydrology=true;
-function finishRender(message:DensityWorkerMessage):void{
+function finishRender(message:TerrainWorkerMessage):void{
   if(!message.ok||!message.heightfield||!message.diagnostics){
     status.textContent=message.error??"สร้างภูมิประเทศสามมิติไม่สำเร็จ";return;
   }
@@ -51,7 +51,7 @@ function finishRender(message:DensityWorkerMessage):void{
     status.textContent="สร้างภูมิประเทศสำเร็จ · Heightfield + surface mesh · Seed "+recipe.seed;updateLabels();
   }catch(error){status.textContent=error instanceof Error?error.message:"สร้างโลกสามมิติไม่สำเร็จ";}
 }
-densityWorker.addEventListener("message",(event:MessageEvent<DensityWorkerMessage>)=>{
+terrainWorker.addEventListener("message",(event:MessageEvent<TerrainWorkerMessage>)=>{
   if(event.data.id!==requestId)return;
   finishRender(event.data);
 });
@@ -60,7 +60,7 @@ function render(refreshHydrology=true):void{
   latestRefreshHydrology=refreshHydrology;
   const id=++requestId;
   status.textContent="กำลังสร้างภูมิประเทศสามมิติ…";
-  densityWorker.postMessage({id,recipe});
+  terrainWorker.postMessage({id,recipe});
 }
 function scheduleRender(refreshHydrology:boolean):void{
   if(renderTimer!==undefined)window.clearTimeout(renderTimer);
@@ -134,5 +134,5 @@ document.querySelector<HTMLButtonElement>("#reset-terrain")!.addEventListener("c
   (document.querySelector<HTMLInputElement>("#seed")!).value=String(recipe.seed);render();
 });
 const observer=new ResizeObserver(()=>renderer.resize());observer.observe(canvas.parentElement!);
-window.addEventListener("beforeunload",()=>{observer.disconnect();densityWorker.terminate();renderer.dispose();});
+window.addEventListener("beforeunload",()=>{observer.disconnect();terrainWorker.terminate();renderer.dispose();});
 render();
