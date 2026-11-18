@@ -1,3 +1,4 @@
+import { buildProceduralTreeGeometry } from "./tree-geometry";
 import { buildHeightfieldMesh } from "../../world/mesh/heightfield-mesh";
 import { sampleElevation, type Heightfield } from "../../world/fields/heightfield";
 import type { DrainageField } from "../../world/hydrology/drainage";
@@ -152,8 +153,95 @@ void main() {
 }`;
 
 
-const treeVertexSource = "#version 300 es\nprecision highp float;\nlayout(location=0) in vec3 aPosition;\nlayout(location=1) in vec3 aNormal;\nlayout(location=2) in vec3 iOffset;\nlayout(location=3) in float iScale;\nlayout(location=4) in float iTint;\nlayout(location=5) in float iSpecies;\nuniform mat4 uMvp;\nout vec3 vNormal;\nout float vHeight;\nout float vTint;\nout float vSpecies;out vec3 vLocalPosition;\nvoid main(){float angle=iTint*6.2831853;mat2 rotation=mat2(cos(angle),-sin(angle),sin(angle),cos(angle));vec3 local=aPosition;vec3 normal=aNormal;float species=floor(iSpecies+0.5);float crown=0.82+fract(iTint*19.17)*0.34;float radialScale=1.0,verticalScale=1.0;if(species<0.5){radialScale=1.12+0.10*sin(aPosition.y*5.0);local.xz*=radialScale;}else if(species<1.5){radialScale=mix(1.28,0.48,smoothstep(0.20,1.0,aPosition.y));local.xz*=radialScale;}else{radialScale=0.72;verticalScale=1.16;local.xz*=radialScale;local.y*=verticalScale;}normal=normalize(vec3(normal.x/radialScale,normal.y/verticalScale,normal.z/radialScale));local*=iScale;local.xz=rotation*local.xz;normal.xz=rotation*normal.xz;local.xz*=crown;normal.xz/=crown;vec3 world=local+iOffset;vNormal=normal;vHeight=aPosition.y;vTint=iTint;vSpecies=iSpecies;vLocalPosition=aPosition;gl_Position=uMvp*vec4(world,1.0);}";
-const treeFragmentSource = "#version 300 es\nprecision highp float;\nin vec3 vNormal;in float vHeight;in float vTint;in float vSpecies;in vec3 vLocalPosition;out vec4 outColor;\nfloat barkNoise(vec3 p){return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453);}\nvoid main(){vec3 n=normalize(vNormal);vec3 light=normalize(vec3(-0.45,0.82,0.36));float diffuse=max(dot(n,light),0.0);vec3 bark=mix(vec3(0.19,0.13,0.085),vec3(0.34,0.23,0.13),vTint*0.55);float groove=sin(atan(vLocalPosition.z,vLocalPosition.x)*22.0+sin(vLocalPosition.y*9.0)*0.8);float grain=0.5+0.5*sin(vLocalPosition.y*92.0+groove*1.7);bark*=1.0+groove*0.035+(grain-0.5)*0.075+(barkNoise(vLocalPosition*38.0)-0.5)*0.045;vec3 leaf;if(vSpecies<0.5)leaf=mix(vec3(0.055,0.20,0.085),vec3(0.24,0.43,0.18),vTint*0.72);else if(vSpecies<1.5)leaf=mix(vec3(0.045,0.16,0.12),vec3(0.16,0.34,0.23),vTint*0.72);else leaf=mix(vec3(0.18,0.20,0.08),vec3(0.43,0.43,0.16),vTint*0.72);leaf*=0.91+barkNoise(vLocalPosition*24.0+vec3(vTint*7.0))*0.16;vec3 color=vHeight<0.38?bark:leaf;color*=0.42+diffuse*0.72;outColor=vec4(color,1.0);}";
+const treeVertexSource = `#version 300 es
+precision highp float;
+layout(location=0) in vec3 aPosition;
+layout(location=1) in vec3 aNormal;
+layout(location=2) in vec2 aUv;
+layout(location=3) in float aPart;
+layout(location=4) in vec3 iOffset;
+layout(location=5) in float iScale;
+layout(location=6) in float iTint;
+layout(location=7) in float iSpecies;
+uniform mat4 uMvp;
+out vec3 vNormal;
+out vec2 vUv;
+out float vPart;
+out float vTint;
+out float vSpecies;
+out vec3 vLocalPosition;
+void main(){
+  float angle=iTint*6.2831853;
+  mat2 rotation=mat2(cos(angle),-sin(angle),sin(angle),cos(angle));
+  vec3 local=aPosition;
+  vec3 normal=aNormal;
+  float species=floor(iSpecies+0.5);
+  float crown=0.90+fract(iTint*19.17)*0.20;
+  float radialScale=1.0;
+  if(species<0.5){
+    radialScale=1.0+0.06*sin(aPosition.y*3.14159);
+  }else if(species<1.5){
+    radialScale=mix(1.34,0.38,smoothstep(0.18,1.0,aPosition.y));
+  }else{
+    radialScale=0.72;
+    local.y*=1.12;
+  }
+  local.xz*=radialScale;
+  normal=normalize(vec3(normal.x/radialScale,normal.y,normal.z/radialScale));
+  local*=iScale;
+  local.xz=rotation*local.xz;
+  normal.xz=rotation*normal.xz;
+  local.xz*=crown;
+  normal.xz/=crown;
+  vec3 world=local+iOffset;
+  vNormal=normal;
+  vUv=aUv;
+  vPart=aPart;
+  vTint=iTint;
+  vSpecies=iSpecies;
+  vLocalPosition=aPosition;
+  gl_Position=uMvp*vec4(world,1.0);
+}`;
+const treeFragmentSource = `#version 300 es
+precision highp float;
+in vec3 vNormal;
+in vec2 vUv;
+in float vPart;
+in float vTint;
+in float vSpecies;
+in vec3 vLocalPosition;
+out vec4 outColor;
+float hash31(vec3 p){
+  p=fract(p*0.1031);
+  p+=dot(p,p.yzx+33.33);
+  return fract((p.x+p.y)*p.z);
+}
+void main(){
+  vec3 n=normalize(gl_FrontFacing?vNormal:-vNormal);
+  vec3 light=normalize(vec3(-0.45,0.82,0.36));
+  float diffuse=max(dot(n,light),0.0);
+  if(vPart>0.5){
+    float y=clamp(vUv.y,0.0,1.0);
+    float halfWidth=0.49*pow(max(sin(3.14159265*y),0.0),0.78)+0.012;
+    if(abs(vUv.x)>halfWidth)discard;
+    float vein=1.0-smoothstep(0.012,0.035,abs(vUv.x));
+    float edge=1.0-smoothstep(0.78,1.0,abs(vUv.x)/max(halfWidth,0.001));
+    vec3 leafA=vSpecies<0.5?vec3(0.075,0.22,0.075):vSpecies<1.5?vec3(0.045,0.17,0.105):vec3(0.16,0.22,0.075);
+    vec3 leafB=vSpecies<0.5?vec3(0.28,0.48,0.16):vSpecies<1.5?vec3(0.18,0.38,0.20):vec3(0.43,0.46,0.17);
+    float variation=hash31(vec3(vLocalPosition*41.0+vTint*13.0));
+    vec3 leaf=mix(leafA,leafB,0.28+variation*0.48);
+    leaf*=0.92+vein*0.12;
+    float backLight=max(dot(-n,light),0.0);
+    float lighting=0.40+diffuse*0.58+backLight*0.18;
+    outColor=vec4(leaf*lighting,1.0);
+  }else{
+    float grooves=sin(atan(vLocalPosition.z,vLocalPosition.x)*31.0+sin(vLocalPosition.y*12.0)*0.7);
+    float grain=0.5+0.5*sin(vLocalPosition.y*118.0+grooves*1.4);
+    vec3 bark=mix(vec3(0.16,0.105,0.065),vec3(0.34,0.235,0.14),0.34+vTint*0.38);
+    bark*=1.0+grooves*0.045+(grain-0.5)*0.09;
+    outColor=vec4(bark*(0.42+diffuse*0.72),1.0);
+  }
+}`;
 const groundVertexSource = `#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPosition;
@@ -274,81 +362,6 @@ function buildGroundCoverGeometry(): GroundGeometryData {
   return {data:new Float32Array(out),ranges};
 }
 
-function buildTreeGeometry(detail: "high" | "medium" | "low" = "high"): Float32Array {
-  const out:number[]=[];
-  const unit=(v:number[])=>{const n=Math.hypot(...v);return n>1e-7?v.map(x=>x/n):[0,1,0];};
-  const tri=(p0:number[],n0:number[],p1:number[],n1:number[],p2:number[],n2:number[])=>{
-    for(const [p,n] of [[p0,n0],[p1,n1],[p2,n2]] as const)out.push(p[0],p[1],p[2],n[0],n[1],n[2]);
-  };
-  const tube=(a:number[],b:number[],ra:number,rb:number,segments=7)=>{
-    const axis=unit(subtract(b,a)),ref=Math.abs(axis[1])>0.92?[1,0,0]:[0,1,0];
-    const side=unit(cross(axis,ref)),up=cross(axis,side);
-    const point=(p:number[],r:number,t:number)=>p.map((v,k)=>v+(side[k]*Math.cos(t)+up[k]*Math.sin(t))*r);
-    const norm=(t:number)=>unit(side.map((v,k)=>v*Math.cos(t)+up[k]*Math.sin(t)));
-    for(let i=0;i<segments;i++){
-      const p=i/segments*Math.PI*2,q=(i+1)/segments*Math.PI*2,a0=point(a,ra,p),a1=point(a,ra,q),b0=point(b,rb,p),b1=point(b,rb,q),np=norm(p),nq=norm(q);
-      tri(a0,np,b0,np,a1,nq);tri(a1,nq,b0,np,b1,nq);
-    }
-  };
-  const leaf=(base:number[],tip:number[],width:number,phase:number)=>{
-    const axis=unit(subtract(tip,base)),side=unit(cross(axis,[Math.sin(phase),0.28,Math.cos(phase)])),normal=unit(cross(side,axis));
-    const ts=detail==="high"?[0,0.42,0.78,1]:detail==="medium"?[0,0.58,1]:[0,0.5,1];
-    const rows=ts.map((t,i)=>{
-      const c=base.map((v,k)=>v+(tip[k]-v)*t+normal[k]*Math.sin(Math.PI*t)*width*0.12);
-      const w=width*Math.pow(Math.sin(Math.PI*t),0.8)*(i===0||i===3?0.025:1);
-      return {l:c.map((v,k)=>v+side[k]*w),r:c.map((v,k)=>v-side[k]*w),m:c.map((v,k)=>v+normal[k]*width*0.10)};
-    });
-    const back=normal.map(v=>-v);
-    for(let i=0;i<rows.length-1;i++){
-      const a=rows[i],b=rows[i+1];
-      tri(a.l,normal,a.m,normal,b.l,normal);tri(a.m,normal,b.m,normal,b.l,normal);
-      tri(a.m,normal,a.r,normal,b.m,normal);tri(a.r,normal,b.r,normal,b.m,normal);
-      tri(b.l,back,a.m,back,a.l,back);tri(b.l,back,b.m,back,a.m,back);
-      tri(b.m,back,a.r,back,b.r,back);tri(a.r,back,b.m,back,b.r,back);
-    }
-  };
-  const rand=(n:number)=>{const x=Math.sin(n*91.73+17.31)*43758.5453;return x-Math.floor(x);};
-  const foliage=(center:number[],size:number,seed:number)=>{
-    // Five loose leaves per twig tip: enough overlap for a natural cluster without a dense solid mass.
-    const leafCount=detail==="high"?5:detail==="medium"?4:3;
-    for(let i=0;i<leafCount;i++){
-      const a=i/leafCount*Math.PI*2+rand(seed+i)*0.55,h=rand(seed*3+i),r=size*(0.48+h*0.25);
-      const base=[center[0]+Math.cos(a)*r*0.18,center[1]+(h-0.5)*size*0.18,center[2]+Math.sin(a)*r*0.18];
-      const tip=[center[0]+Math.cos(a)*r,center[1]+size*(0.10+h*0.30),center[2]+Math.sin(a)*r];
-      leaf(base,tip,size*0.13,a+0.3);
-    }
-  };
-  // Flared roots and a gently bending, tapered trunk.
-  for(let i=0;i<6;i++){
-    const a=i/6*Math.PI*2+0.2,x=Math.cos(a),z=Math.sin(a);
-    tube([x*0.025,0.12,z*0.025],[x*0.13,0.035,z*0.13],0.024,0.010,5);
-    tube([x*0.13,0.035,z*0.13],[x*0.21,-0.035,z*0.21],0.010,0.0015,5);
-  }
-  const trunk=[[0,0,0],[0.012,0.26,-0.006],[-0.009,0.52,0.008],[0.014,0.77,0.002],[0.018,1,0]];
-  for(let i=0;i<trunk.length-1;i++)tube(trunk[i],trunk[i+1],0.065-i*0.014,0.052-i*0.014,9);
-  // Four staggered whorls; each primary limb splits into only two fine twigs.
-  let seed=1;
-  const tierCount=detail==="high"?4:detail==="medium"?3:2;
-  const limbCount=detail==="high"?4:3;
-  const twigCount=detail==="high"?2:1;
-  for(let tier=0;tier<tierCount;tier++){
-    const y=0.34+tier*0.145,origin=[Math.sin(tier*1.4)*0.012,y,Math.cos(tier*1.8)*0.01];
-    for(let j=0;j<limbCount;j++){
-      const a=j/limbCount*Math.PI*2+tier*1.83,len=(0.35-tier*0.045)*(0.88+rand(seed)*0.16);
-      const end=[origin[0]+Math.cos(a)*len, y+len*0.34, origin[2]+Math.sin(a)*len];
-      tube(origin,end,0.023-tier*0.002,0.006,6);
-      for(let k=0;k<twigCount;k++){
-        const sideAngle=a+(k===0?-0.58:0.58),t=0.56+k*0.12;
-        const start=origin.map((v,n)=>v+(end[n]-v)*t);
-        const twigEnd=[start[0]+Math.cos(sideAngle)*len*0.43,start[1]+len*0.28,start[2]+Math.sin(sideAngle)*len*0.43];
-        tube(start,twigEnd,0.007,0.002,5);
-        foliage(twigEnd,len*0.34,seed++);
-      }
-      foliage(end,len*0.32,seed++);
-    }
-  }
-  return new Float32Array(out);
-}
 
 function compile(gl: WebGL2RenderingContext, type: number, source: string): WebGLShader {
   const shader = gl.createShader(type);
@@ -575,16 +588,17 @@ export class TerrainPreviewRenderer {
     this.treeVao=treeVao;this.treeMidVao=treeMidVao;this.treeLowVao=treeLowVao;
     this.treeGeometryBuffer=treeGeometry;this.treeMidGeometryBuffer=treeMidGeometry;this.treeLowGeometryBuffer=treeLowGeometry;
     this.treeInstanceBuffer=treeInstances;this.treeMidInstanceBuffer=treeMidInstances;this.treeLowInstanceBuffer=treeLowInstances;
-    const lods=[{vao:treeVao,geometry:treeGeometry,instances:treeInstances,data:buildTreeGeometry("high")},{vao:treeMidVao,geometry:treeMidGeometry,instances:treeMidInstances,data:buildTreeGeometry("medium")},{vao:treeLowVao,geometry:treeLowGeometry,instances:treeLowInstances,data:buildTreeGeometry("low")}];
+    const lods=[{vao:treeVao,geometry:treeGeometry,instances:treeInstances,data:buildProceduralTreeGeometry("high")},{vao:treeMidVao,geometry:treeMidGeometry,instances:treeMidInstances,data:buildProceduralTreeGeometry("medium")},{vao:treeLowVao,geometry:treeLowGeometry,instances:treeLowInstances,data:buildProceduralTreeGeometry("low")}];
     this.treeVertexCount=lods[0].data.length/6;this.treeMidVertexCount=lods[1].data.length/6;this.treeLowVertexCount=lods[2].data.length/6;
     for(const lod of lods){
       gl.bindVertexArray(lod.vao);gl.bindBuffer(gl.ARRAY_BUFFER,lod.geometry);gl.bufferData(gl.ARRAY_BUFFER,lod.data,gl.STATIC_DRAW);
-      gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,24,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,3,gl.FLOAT,false,24,12);
+      gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,36,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,3,gl.FLOAT,false,36,12);
+      gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,2,gl.FLOAT,false,36,24);gl.enableVertexAttribArray(3);gl.vertexAttribPointer(3,1,gl.FLOAT,false,36,32);
       gl.bindBuffer(gl.ARRAY_BUFFER,lod.instances);
-      gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,3,gl.FLOAT,false,24,0);gl.vertexAttribDivisor(2,1);
-      gl.enableVertexAttribArray(3);gl.vertexAttribPointer(3,1,gl.FLOAT,false,24,12);gl.vertexAttribDivisor(3,1);
-      gl.enableVertexAttribArray(4);gl.vertexAttribPointer(4,1,gl.FLOAT,false,24,16);gl.vertexAttribDivisor(4,1);
-      gl.enableVertexAttribArray(5);gl.vertexAttribPointer(5,1,gl.FLOAT,false,24,20);gl.vertexAttribDivisor(5,1);
+      gl.enableVertexAttribArray(4);gl.vertexAttribPointer(4,3,gl.FLOAT,false,24,0);gl.vertexAttribDivisor(4,1);
+      gl.enableVertexAttribArray(5);gl.vertexAttribPointer(5,1,gl.FLOAT,false,24,12);gl.vertexAttribDivisor(5,1);
+      gl.enableVertexAttribArray(6);gl.vertexAttribPointer(6,1,gl.FLOAT,false,24,16);gl.vertexAttribDivisor(6,1);
+      gl.enableVertexAttribArray(7);gl.vertexAttribPointer(7,1,gl.FLOAT,false,24,20);gl.vertexAttribDivisor(7,1);
     }
     gl.bindVertexArray(null);
     const groundVs=compile(gl,gl.VERTEX_SHADER,groundVertexSource),groundFs=compile(gl,gl.FRAGMENT_SHADER,groundFragmentSource);
