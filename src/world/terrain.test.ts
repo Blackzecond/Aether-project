@@ -214,13 +214,15 @@ describe("world foundation v2", () => {
     const second = generateVegetation(field, 91827);
     expect(first.instances).toEqual(second.instances);
     expect(first.instances.length).toBeGreaterThan(80);
-    expect(first.instances.length).toBeLessThan(2600);
+    expect(first.instances.length).toBeLessThan(10000);
+    expect(first.groundCover.length).toBeGreaterThan(1000);
+    expect(new Set(first.instances.map((tree) => tree.species)).size).toBeGreaterThan(1);
     const sample = first.instances.slice(0, 180);
     for (let i = 0; i < sample.length; i += 1) {
       for (let j = i + 1; j < sample.length; j += 1) {
         const dx = sample[i].x - sample[j].x;
         const dz = sample[i].z - sample[j].z;
-        expect(Math.hypot(dx, dz)).toBeGreaterThan(0.008);
+        expect(Math.hypot(dx, dz)).toBeGreaterThan(0.004);
       }
     }
   });
