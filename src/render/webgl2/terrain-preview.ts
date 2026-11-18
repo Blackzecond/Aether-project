@@ -143,8 +143,8 @@ void main() {
 }`;
 
 
-const treeVertexSource = "#version 300 es\nprecision highp float;\nlayout(location=0) in vec3 aPosition;\nlayout(location=1) in vec3 aNormal;\nlayout(location=2) in vec3 iOffset;\nlayout(location=3) in float iScale;\nlayout(location=4) in float iTint;\nuniform mat4 uMvp;\nout vec3 vNormal;\nout float vHeight;\nout float vTint;\nvoid main(){float angle=iTint*6.2831853;mat2 rotation=mat2(cos(angle),-sin(angle),sin(angle),cos(angle));vec3 local=aPosition*iScale;local.xz=rotation*local.xz;local.xz*=0.82+fract(iTint*19.17)*0.34;vec3 world=local+iOffset;vNormal=aNormal;vHeight=aPosition.y;vTint=iTint;gl_Position=uMvp*vec4(world,1.0);}";
-const treeFragmentSource = "#version 300 es\nprecision highp float;\nin vec3 vNormal;in float vHeight;in float vTint;out vec4 outColor;\nvoid main(){vec3 n=normalize(vNormal);vec3 light=normalize(vec3(-0.45,0.82,0.36));float diffuse=max(dot(n,light),0.0);vec3 bark=mix(vec3(0.19,0.13,0.085),vec3(0.34,0.23,0.13),vTint*0.55);vec3 leaf=mix(vec3(0.055,0.19,0.105),vec3(0.20,0.34,0.16),vTint*0.72);vec3 color=vHeight<0.38?bark:leaf;color*=0.42+diffuse*0.72;outColor=vec4(color,1.0);}";
+const treeVertexSource = "#version 300 es\nprecision highp float;\nlayout(location=0) in vec3 aPosition;\nlayout(location=1) in vec3 aNormal;\nlayout(location=2) in vec3 iOffset;\nlayout(location=3) in float iScale;\nlayout(location=4) in float iTint;\nlayout(location=5) in float iSpecies;\nuniform mat4 uMvp;\nout vec3 vNormal;\nout float vHeight;\nout float vTint;\nout float vSpecies;\nvoid main(){float angle=iTint*6.2831853;mat2 rotation=mat2(cos(angle),-sin(angle),sin(angle),cos(angle));vec3 local=aPosition;float species=floor(iSpecies+0.5);float crown=0.82+fract(iTint*19.17)*0.34;if(species<0.5){local.xz*=1.12+0.10*sin(aPosition.y*5.0);}else if(species<1.5){local.xz*=mix(1.28,0.48,smoothstep(0.20,1.0,aPosition.y));}else{local.xz*=0.72;local.y*=1.16;}local*=iScale;local.xz=rotation*local.xz;local.xz*=crown;vec3 world=local+iOffset;vNormal=aNormal;vHeight=aPosition.y;vTint=iTint;vSpecies=iSpecies;gl_Position=uMvp*vec4(world,1.0);}";
+const treeFragmentSource = "#version 300 es\nprecision highp float;\nin vec3 vNormal;in float vHeight;in float vTint;in float vSpecies;out vec4 outColor;\nvoid main(){vec3 n=normalize(vNormal);vec3 light=normalize(vec3(-0.45,0.82,0.36));float diffuse=max(dot(n,light),0.0);vec3 bark=mix(vec3(0.19,0.13,0.085),vec3(0.34,0.23,0.13),vTint*0.55);vec3 leaf;if(vSpecies<0.5)leaf=mix(vec3(0.055,0.20,0.085),vec3(0.24,0.43,0.18),vTint*0.72);else if(vSpecies<1.5)leaf=mix(vec3(0.045,0.16,0.12),vec3(0.16,0.34,0.23),vTint*0.72);else leaf=mix(vec3(0.18,0.20,0.08),vec3(0.43,0.43,0.16),vTint*0.72);vec3 color=vHeight<0.38?bark:leaf;color*=0.42+diffuse*0.72;outColor=vec4(color,1.0);}";
 const groundVertexSource = `#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPosition;
@@ -458,7 +458,8 @@ export class TerrainPreviewRenderer {
     gl.bindBuffer(gl.ARRAY_BUFFER,treeInstances);
     gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,3,gl.FLOAT,false,20,0);gl.vertexAttribDivisor(2,1);
     gl.enableVertexAttribArray(3);gl.vertexAttribPointer(3,1,gl.FLOAT,false,20,12);gl.vertexAttribDivisor(3,1);
-    gl.enableVertexAttribArray(4);gl.vertexAttribPointer(4,1,gl.FLOAT,false,20,16);gl.vertexAttribDivisor(4,1);
+    gl.enableVertexAttribArray(4);gl.vertexAttribPointer(4,1,gl.FLOAT,false,24,16);gl.vertexAttribDivisor(4,1);
+    gl.enableVertexAttribArray(5);gl.vertexAttribPointer(5,1,gl.FLOAT,false,24,20);gl.vertexAttribDivisor(5,1);
     gl.bindVertexArray(null);
     const groundVs=compile(gl,gl.VERTEX_SHADER,groundVertexSource),groundFs=compile(gl,gl.FRAGMENT_SHADER,groundFragmentSource);
     const groundProgram=gl.createProgram();if(!groundProgram)throw new Error("ไม่สามารถสร้าง Ground Cover Program ได้");
@@ -882,11 +883,11 @@ export class TerrainPreviewRenderer {
     if(exploring){
       let treeCursor=0;
       for(let i=0;i<this.treeCount;i++){
-        const source=i*5,dx=this.treeInstanceData[source]-camera[0],dz=this.treeInstanceData[source+2]-camera[2];
+        const source=i*6,dx=this.treeInstanceData[source]-camera[0],dz=this.treeInstanceData[source+2]-camera[2];
         if(dx*dx+dz*dz>0.28*0.28)continue;
-        for(let j=0;j<5;j++)this.treeVisibleData[treeCursor++]=this.treeInstanceData[source+j];
+        for(let j=0;j<6;j++)this.treeVisibleData[treeCursor++]=this.treeInstanceData[source+j];
       }
-      treeDrawCount=treeCursor/5;
+      treeDrawCount=treeCursor/6;
       gl.bindBuffer(gl.ARRAY_BUFFER,this.treeInstanceBuffer);
       gl.bufferData(gl.ARRAY_BUFFER,this.treeVisibleData.subarray(0,treeCursor),gl.DYNAMIC_DRAW);
       let groundCursor=0;
