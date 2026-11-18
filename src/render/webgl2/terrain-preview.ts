@@ -410,7 +410,6 @@ export class TerrainPreviewRenderer {
   private treeVisibleData = new Float32Array(0);
   private groundInstanceData = new Float32Array(0);
   private groundVisibleData = new Float32Array(0);
-  private instanceBuffersCulled = false;
   private renderRequest = 0;
   private waterVertexCount = 0;
   private maximumAccumulation = 1;
@@ -639,7 +638,7 @@ export class TerrainPreviewRenderer {
   setVegetation(instances: readonly VegetationInstance[]): void {
     const data=new Float32Array(instances.length*6);
     for(let i=0;i<instances.length;i++){const item=instances[i],offset=i*6;data[offset]=item.x;data[offset+1]=item.y;data[offset+2]=item.z;data[offset+3]=item.height;data[offset+4]=item.tint;data[offset+5]=item.species;}
-    this.treeCount=instances.length;this.treeInstanceData=data;this.treeVisibleData=new Float32Array(data.length);this.instanceBuffersCulled=false;this.gl.bindBuffer(this.gl.ARRAY_BUFFER,this.treeInstanceBuffer);this.gl.bufferData(this.gl.ARRAY_BUFFER,data,this.gl.STATIC_DRAW);
+    this.treeCount=instances.length;this.treeInstanceData=data;this.treeVisibleData=new Float32Array(data.length);this.gl.bindBuffer(this.gl.ARRAY_BUFFER,this.treeInstanceBuffer);this.gl.bufferData(this.gl.ARRAY_BUFFER,data,this.gl.STATIC_DRAW);
   }
 
   setGroundCover(instances: readonly GroundCoverInstance[]): void {
@@ -915,7 +914,6 @@ export class TerrainPreviewRenderer {
     const groundDrawCount=groundCursor/6;
     gl.bindBuffer(gl.ARRAY_BUFFER,this.groundInstanceBuffer);
     gl.bufferSubData(gl.ARRAY_BUFFER,0,this.groundVisibleData.subarray(0,groundCursor));
-    this.instanceBuffersCulled=true;
     if((this.mode==="world" || this.mode==="first-person") && treeDrawCount>0){
       gl.useProgram(this.treeProgram);gl.uniformMatrix4fv(this.treeMvpLocation,false,mvp);
       gl.bindVertexArray(this.treeVao);gl.drawArraysInstanced(gl.TRIANGLES,0,this.treeVertexCount,treeDrawCount);gl.bindVertexArray(null);
