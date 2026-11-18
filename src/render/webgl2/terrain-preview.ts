@@ -1021,7 +1021,8 @@ export class TerrainPreviewRenderer {
     // Keep distant vegetation in the terrain material; geometry is reserved for nearby detail.
     const focus=exploring?camera:this.cameraTarget;
     const treeRadius=exploring?0.28:1.18;
-    const groundRadius=exploring?0.20:(this.distance<this.fitDistance*0.65?1.15:0.82);
+    // Nearby blades use geometry; distant meadows stay in the terrain material to avoid thousands of tiny draws.
+    const groundRadius=exploring?0.20:(this.distance<this.fitDistance*0.65?0.48:0.34);
     const treeCursors=collectVisibleTreeLods(this.treeInstanceData,this.treeSpatialBins,focus,treeRadius,this.treeVisibleData,this.treeMidVisibleData,this.treeLowVisibleData,exploring?0.12:0.22,exploring?0.22:0.48);
     const treeDrawCounts=treeCursors.map(cursor=>cursor/6);
     const treeBuffers=[this.treeInstanceBuffer,this.treeMidInstanceBuffer,this.treeLowInstanceBuffer],treeData=[this.treeVisibleData,this.treeMidVisibleData,this.treeLowVisibleData];
