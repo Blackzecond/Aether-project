@@ -1054,8 +1054,9 @@ export class TerrainPreviewRenderer {
     if(this.mode==="world" || this.mode==="first-person"){
       gl.useProgram(this.treeProgram);gl.uniformMatrix4fv(this.treeMvpLocation,false,mvp);
       const vaos=[this.treeVao,this.treeMidVao,this.treeLowVao],counts=[this.treeVertexCount,this.treeMidVertexCount,this.treeLowVertexCount];
+      gl.disable(gl.CULL_FACE);
       for(let lod=0;lod<3;lod++)if(treeDrawCounts[lod]>0){gl.bindVertexArray(vaos[lod]);gl.drawArraysInstanced(gl.TRIANGLES,0,counts[lod],treeDrawCounts[lod]);}
-      gl.bindVertexArray(null);
+      gl.bindVertexArray(null);gl.enable(gl.CULL_FACE);
     }
     if(this.mode==="world" || this.mode==="first-person"){
       gl.useProgram(this.groundProgram);gl.uniformMatrix4fv(this.groundMvpLocation,false,mvp);
