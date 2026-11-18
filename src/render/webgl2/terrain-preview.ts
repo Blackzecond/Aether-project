@@ -292,7 +292,7 @@ function buildTreeGeometry(detail: "high" | "medium" | "low" = "high"): Float32A
   };
   const leaf=(base:number[],tip:number[],width:number,phase:number)=>{
     const axis=unit(subtract(tip,base)),side=unit(cross(axis,[Math.sin(phase),0.28,Math.cos(phase)])),normal=unit(cross(side,axis));
-    const ts=detail==="high"?[0,0.42,0.78,1]:detail==="medium"?[0,0.58,1]:[0,1];
+    const ts=detail==="high"?[0,0.42,0.78,1]:detail==="medium"?[0,0.58,1]:[0,0.5,1];
     const rows=ts.map((t,i)=>{
       const c=base.map((v,k)=>v+(tip[k]-v)*t+normal[k]*Math.sin(Math.PI*t)*width*0.12);
       const w=width*Math.pow(Math.sin(Math.PI*t),0.8)*(i===0||i===3?0.025:1);
@@ -310,7 +310,7 @@ function buildTreeGeometry(detail: "high" | "medium" | "low" = "high"): Float32A
   const rand=(n:number)=>{const x=Math.sin(n*91.73+17.31)*43758.5453;return x-Math.floor(x);};
   const foliage=(center:number[],size:number,seed:number)=>{
     // Five loose leaves per twig tip: enough overlap for a natural cluster without a dense solid mass.
-    const leafCount=detail==="high"?5:detail==="medium"?3:2;
+    const leafCount=detail==="high"?5:detail==="medium"?4:3;
     for(let i=0;i<leafCount;i++){
       const a=i/leafCount*Math.PI*2+rand(seed+i)*0.55,h=rand(seed*3+i),r=size*(0.48+h*0.25);
       const base=[center[0]+Math.cos(a)*r*0.18,center[1]+(h-0.5)*size*0.18,center[2]+Math.sin(a)*r*0.18];
@@ -330,7 +330,7 @@ function buildTreeGeometry(detail: "high" | "medium" | "low" = "high"): Float32A
   let seed=1;
   const tierCount=detail==="high"?4:detail==="medium"?3:2;
   const limbCount=detail==="high"?4:3;
-  const twigCount=detail==="high"?2:detail==="medium"?1:0;
+  const twigCount=detail==="high"?2:1;
   for(let tier=0;tier<tierCount;tier++){
     const y=0.34+tier*0.145,origin=[Math.sin(tier*1.4)*0.012,y,Math.cos(tier*1.8)*0.01];
     for(let j=0;j<limbCount;j++){
