@@ -303,23 +303,20 @@ function buildTreeGeometry(): Float32Array {
     const axis=[dx/length,dy/length,dz/length];
     const side=normalize(cross(axis,[Math.sin(phase),0.25,Math.cos(phase)]));
     const up=normalize(cross(side,axis));
-    const sections=[0,0.48,1];
-    const centers=sections.map(t=>[
-      base[0]+dx*t+up[0]*Math.sin(Math.PI*t)*width*0.20,
-      base[1]+dy*t+up[1]*Math.sin(Math.PI*t)*width*0.20,
-      base[2]+dz*t+up[2]*Math.sin(Math.PI*t)*width*0.20,
-    ]);
-    const widths=[0,width,0];
-    const left=centers.map((p,i)=>p.map((v,k)=>v+side[k]*widths[i]));
-    const right=centers.map((p,i)=>p.map((v,k)=>v-side[k]*widths[i]));
+    const center=[
+      (base[0]+tip[0])*0.5+up[0]*width*0.18,
+      (base[1]+tip[1])*0.5+up[1]*width*0.18,
+      (base[2]+tip[2])*0.5+up[2]*width*0.18,
+    ];
+    const left=center.map((v,k)=>v+side[k]*width);
+    const right=center.map((v,k)=>v-side[k]*width);
     const front=normalize(cross(axis,side));
-    for(let i=0;i<2;i++){
-      const a=left[i],b=right[i],c=left[i+1],d=right[i+1];
-      const midNormal=normalize([front[0]+up[0]*0.45,front[1]+up[1]*0.45,front[2]+up[2]*0.45]);
-      smoothTri(a,front,b,front,c,midNormal);smoothTri(b,front,d,midNormal,c,midNormal);
-      const back=front.map(v=>-v),backMid=midNormal.map(v=>-v);
-      smoothTri(c,back,b,back,a,back);smoothTri(c,backMid,d,backMid,b,back);
-    }
+    const raised=normalize([front[0]+up[0]*0.42,front[1]+up[1]*0.42,front[2]+up[2]*0.42]);
+    smoothTri(base,front,left,raised,tip,front);
+    smoothTri(base,front,tip,front,right,raised);
+    const back=front.map(v=>-v),backRaised=raised.map(v=>-v);
+    smoothTri(tip,back,left,backRaised,base,back);
+    smoothTri(right,backRaised,tip,back,base,back);
   };
   // Buttress roots and tapered branches use smooth radial normals to avoid a faceted trunk.
   for(let root=0;root<5;root++){
@@ -340,13 +337,10 @@ function buildTreeGeometry(): Float32Array {
       const end=[center[0]+Math.cos(angle)*length,y+length*(0.34+(j%2)*0.08),center[2]+Math.sin(angle)*length];
       const mid=[center[0]+Math.cos(angle)*length*0.52,y+length*0.18,center[2]+Math.sin(angle)*length*0.52];
       tube(center,mid,0.027-tier*0.002,0.014-tier*0.001,5);tube(mid,end,0.014-tier*0.001,0.0035,4);
-      const leafBase=[mid[0]+(end[0]-mid[0])*0.68,mid[1]+(end[1]-mid[1])*0.68,mid[2]+(end[2]-mid[2])*0.68];
       const clusterCenter=[end[0],end[1]+0.018,end[2]];
-      // Small irregular clusters follow the branch direction instead of forming round balls.
+      // Three separate leaves radiate from each twig tip, leaving gaps in the crown silhouette.
       for(let l=0;l<3;l++){
         const phase=angle+l*Math.PI*2/3+tier*0.73;
-        const spread=0.052+(l%2)*0.012;
-        leaf(leafBase,[leafBase[0]+Math.cos(phase)*spread,leafBase[1]+0.055,leafBase[2]+Math.sin(phase)*spread],0.022,phase);
         leaf(clusterCenter,[clusterCenter[0]+Math.cos(phase)*0.078,clusterCenter[1]+0.038+(l===1?0.018:0),clusterCenter[2]+Math.sin(phase)*0.078],0.027,phase+0.4);
       }
     }
