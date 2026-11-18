@@ -276,12 +276,6 @@ function buildGroundCoverGeometry(): GroundGeometryData {
 
 function buildTreeGeometry(): Float32Array {
   const out:number[]=[];
-  const tri=(a:number[],b:number[],c:number[])=>{
-    const ux=b[0]-a[0],uy=b[1]-a[1],uz=b[2]-a[2],vx=c[0]-a[0],vy=c[1]-a[1],vz=c[2]-a[2];
-    let nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;const len=Math.hypot(nx,ny,nz)||1;
-    nx/=len;ny/=len;nz/=len;
-    for(const p of [a,b,c])out.push(p[0],p[1],p[2],nx,ny,nz);
-  };
   const smoothTri=(p0:number[],n0:number[],p1:number[],n1:number[],p2:number[],n2:number[])=>{
     for(const [p,n] of [[p0,n0],[p1,n1],[p2,n2]] as const)out.push(p[0],p[1],p[2],n[0],n[1],n[2]);
   };
