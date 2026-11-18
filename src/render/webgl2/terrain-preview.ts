@@ -117,7 +117,12 @@ void main() {
     float grassGrain=distant?0.5:noise2(texCoord*260.0+vec2(meadowDetail*3.0,meadowPatch*2.0));
     vec3 meadowColor=mix(vec3(0.16,0.29,0.105),vec3(0.31,0.43,0.16),meadowPatch*0.72+meadowDetail*0.28);
     meadowColor*=0.91+grassGrain*0.16;
-    float meadowCoverage=grassSuitability*(0.48+smoothstep(0.30,0.68,meadowPatch)*0.44);
+    float forestSuitability=(1.0-smoothstep(0.48,0.76,height))*(1.0-smoothstep(0.20,0.62,slope))*smoothstep(0.025,0.12,height);
+    float forestNoise=fbm2(texCoord*6.8+vec2(31.7,12.1))*0.72+fbm2(texCoord*17.0+vec2(4.7,28.3))*0.28;
+    float forestPatch=forestSuitability*smoothstep(0.43,0.66,forestNoise);
+    vec3 forestColor=mix(vec3(0.075,0.17,0.085),vec3(0.16,0.27,0.12),meadowPatch*0.7+meadowDetail*0.3);
+    base=mix(base,forestColor,forestPatch*0.62);
+    float meadowCoverage=grassSuitability*(0.48+smoothstep(0.30,0.68,meadowPatch)*0.44)*(1.0-forestPatch*0.88);
     base=mix(base,meadowColor,meadowCoverage);
     float broadTexture=distant?noise2(texCoord*5.0):fbm2(texCoord*18.0);
     float stoneGrain=distant?0.5:fbm2(texCoord*74.0);
@@ -297,40 +302,39 @@ function buildTreeGeometry(): Float32Array {
   };
 
   // Buttress roots and tapered branches use smooth radial normals to avoid a faceted trunk.
-  for(let root=0;root<7;root++){
+  for(let root=0;root<5;root++){
     const angle=root/7*Math.PI*2+0.19;
     const start=[Math.cos(angle)*0.035,0.105,Math.sin(angle)*0.035];
     const middle=[Math.cos(angle)*0.16,0.035,Math.sin(angle)*0.16];
     const tip=[Math.cos(angle)*0.30,-0.045,Math.sin(angle)*0.30];
-    tube(start,middle,0.034,0.022,8);tube(middle,tip,0.022,0.0035,7);
+    tube(start,middle,0.034,0.022,6);tube(middle,tip,0.022,0.0035,5);
   }
   const trunk0=[0,0,0],trunk1=[0.018,0.36,-0.008],trunk2=[-0.012,0.70,0.012],trunk3=[0.015,1,0];
-  tube(trunk0,trunk1,0.075,0.052,14);tube(trunk1,trunk2,0.052,0.029,12);tube(trunk2,trunk3,0.029,0.008,10);
-  for(let tier=0;tier<6;tier++){
-    const y=0.30+tier*0.11;
+  tube(trunk0,trunk1,0.075,0.052,10);tube(trunk1,trunk2,0.052,0.029,9);tube(trunk2,trunk3,0.029,0.008,8);
+  for(let tier=0;tier<4;tier++){
+    const y=0.34+tier*0.15;
     const center=[Math.sin(tier*1.7)*0.018,y,Math.cos(tier*1.3)*0.014];
-    for(let j=0;j<4;j++){
-      const angle=j/4*Math.PI*2+tier*1.91;
-      const length=(0.34-tier*0.032)*(0.82+0.18*Math.sin(j*4.1+tier));
+    for(let j=0;j<3;j++){
+      const angle=j/3*Math.PI*2+tier*1.91;
+      const length=(0.34-tier*0.035)*(0.82+0.18*Math.sin(j*4.1+tier));
       const end=[center[0]+Math.cos(angle)*length,y+length*(0.34+(j%2)*0.08),center[2]+Math.sin(angle)*length];
       const mid=[center[0]+Math.cos(angle)*length*0.52,y+length*0.18,center[2]+Math.sin(angle)*length*0.52];
-      tube(center,mid,0.027-tier*0.002,0.014-tier*0.001,7);tube(mid,end,0.014-tier*0.001,0.0035,6);
+      tube(center,mid,0.027-tier*0.002,0.014-tier*0.001,5);tube(mid,end,0.014-tier*0.001,0.0035,4);
       const leafBase=[mid[0]+(end[0]-mid[0])*0.72,mid[1]+(end[1]-mid[1])*0.72,mid[2]+(end[2]-mid[2])*0.72];
-      for(let l=0;l<2;l++){
+      for(let l=0;l<1;l++){
         const phase=angle+(l===0?0.85:-0.85)+tier*0.73;
         leaf(leafBase,[leafBase[0]+Math.cos(phase)*0.085,leafBase[1]+0.045,leafBase[2]+Math.sin(phase)*0.085],0.026,phase);
       }
-      for(let l=0;l<3;l++){
+      for(let l=0;l<2;l++){
         const phase=angle+l*Math.PI*2/3+tier*0.61;
         leaf(end,[end[0]+Math.cos(phase)*0.095,end[1]+0.055,end[2]+Math.sin(phase)*0.095],0.032,phase);
       }
     }
   }
   // Rounded overlapping foliage masses soften the crown silhouette and shade smoothly.
-  canopyBlob([-0.16,0.67,0.08],[0.19,0.20,0.18],0.4);
-  canopyBlob([0.15,0.72,-0.10],[0.21,0.22,0.19],1.7);
-  canopyBlob([0.02,0.86,0.03],[0.17,0.19,0.17],2.6);
-  canopyBlob([-0.02,0.52,-0.16],[0.16,0.16,0.17],3.2);
+  canopyBlob([-0.15,0.67,0.08],[0.20,0.21,0.19],0.4);
+  canopyBlob([0.15,0.73,-0.10],[0.21,0.22,0.19],1.7);
+  canopyBlob([0.01,0.86,0.03],[0.17,0.18,0.17],2.6);
   return new Float32Array(out);
 }
 
@@ -439,7 +443,6 @@ export class TerrainPreviewRenderer {
   private readonly groundGeometryRanges:readonly {first:number;count:number}[];
   private groundKindStarts=[0,0,0,0];
   private groundKindCounts=[0,0,0,0];
-  private groundCount = 0;
   private treeCount = 0;
   private treeInstanceData = new Float32Array(0);
   private treeVisibleData = new Float32Array(0);
@@ -687,7 +690,7 @@ export class TerrainPreviewRenderer {
         data[cursor++]=item.scale;data[cursor++]=item.tint;data[cursor++]=item.kind;
       }
     }
-    this.groundCount=instances.length;this.groundInstanceData=data;this.groundVisibleData=new Float32Array(data.length);
+    this.groundInstanceData=data;this.groundVisibleData=new Float32Array(data.length);
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER,this.groundInstanceBuffer);
     this.gl.bufferData(this.gl.ARRAY_BUFFER,data,this.gl.STATIC_DRAW);
   }
@@ -933,7 +936,7 @@ export class TerrainPreviewRenderer {
     gl.bindVertexArray(null);
     // Keep distant vegetation in the terrain material; geometry is reserved for nearby detail.
     const focus=exploring?camera:this.cameraTarget;
-    const treeRadius=exploring?0.28:2.15;
+    const treeRadius=exploring?0.28:1.18;
     const groundRadius=exploring?0.20:(this.distance<this.fitDistance*0.65?1.15:0.82);
     const treeRadiusSquared=treeRadius*treeRadius,groundRadiusSquared=groundRadius*groundRadius;
     let treeCursor=0;
