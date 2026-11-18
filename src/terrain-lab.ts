@@ -21,7 +21,7 @@ interface DensityWorkerMessage {
   readonly diagnostics?:{readonly min:number;readonly max:number;readonly mean:number;readonly variance:number;readonly slopeMean:number};
   readonly backend?:"heightfield";
 }
-const densityWorker=new Worker(new URL("./world/volume/density-worker.ts",import.meta.url),{type:"module"});
+const densityWorker=new Worker(new URL("./world/terrain/terrain-worker.ts",import.meta.url),{type:"module"});
 let requestId=0;
 let renderTimer:number|undefined;
 let latestRefreshHydrology=true;
