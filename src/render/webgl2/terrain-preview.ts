@@ -456,8 +456,8 @@ export class TerrainPreviewRenderer {
     gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,24,0);
     gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,3,gl.FLOAT,false,24,12);
     gl.bindBuffer(gl.ARRAY_BUFFER,treeInstances);
-    gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,3,gl.FLOAT,false,20,0);gl.vertexAttribDivisor(2,1);
-    gl.enableVertexAttribArray(3);gl.vertexAttribPointer(3,1,gl.FLOAT,false,20,12);gl.vertexAttribDivisor(3,1);
+    gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,3,gl.FLOAT,false,24,0);gl.vertexAttribDivisor(2,1);
+    gl.enableVertexAttribArray(3);gl.vertexAttribPointer(3,1,gl.FLOAT,false,24,12);gl.vertexAttribDivisor(3,1);
     gl.enableVertexAttribArray(4);gl.vertexAttribPointer(4,1,gl.FLOAT,false,24,16);gl.vertexAttribDivisor(4,1);
     gl.enableVertexAttribArray(5);gl.vertexAttribPointer(5,1,gl.FLOAT,false,24,20);gl.vertexAttribDivisor(5,1);
     gl.bindVertexArray(null);
@@ -623,8 +623,8 @@ export class TerrainPreviewRenderer {
   }
 
   setVegetation(instances: readonly VegetationInstance[]): void {
-    const data=new Float32Array(instances.length*5);
-    for(let i=0;i<instances.length;i++){const item=instances[i],offset=i*5;data[offset]=item.x;data[offset+1]=item.y;data[offset+2]=item.z;data[offset+3]=item.height;data[offset+4]=item.tint;}
+    const data=new Float32Array(instances.length*6);
+    for(let i=0;i<instances.length;i++){const item=instances[i],offset=i*6;data[offset]=item.x;data[offset+1]=item.y;data[offset+2]=item.z;data[offset+3]=item.height;data[offset+4]=item.tint;data[offset+5]=item.species;}
     this.treeCount=instances.length;this.treeInstanceData=data;this.treeVisibleData=new Float32Array(data.length);this.instanceBuffersCulled=false;this.gl.bindBuffer(this.gl.ARRAY_BUFFER,this.treeInstanceBuffer);this.gl.bufferData(this.gl.ARRAY_BUFFER,data,this.gl.STATIC_DRAW);
   }
 
