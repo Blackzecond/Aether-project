@@ -1,37 +1,52 @@
-# Aether Project
+# Aether — Procedural World Generator
 
-A lightweight, procedural-first creation studio for 2D, 2.5D and 3D work.
+Aether is built around one shared world-space model. The terrain is the authoritative foundation: hydrology, vegetation, atmosphere and lighting must derive from the same surface and coordinates rather than drawing independent scenery layers.
 
-Aether prioritizes deterministic generation, reusable rules, low memory use and a mobile-aware preview. It starts with a small 2D procedural playground before adding heavier rendering capabilities.
+## Active world pipeline
 
-## Principles
+- Deterministic, seeded terrain generation in a dedicated Web Worker
+- A 256 × 256 macro heightfield is the authoritative surface for terrain, water and vegetation
+- Indexed WebGL2 terrain mesh with per-vertex normals
+- Hydrology and vegetation sample the same heightfield used by the rendered terrain
+- Terrain controls regenerate the shared world without blocking the UI
+- WebGPU is optional; the active macro-terrain path has a WebGL2-compatible CPU baseline
 
-- Procedural-first: generate from rules, parameters and seeds.
-- Mobile-aware: adaptive quality, bounded workloads and no unnecessary per-frame work.
-- Small core: avoid runtime dependencies until a measured need exists.
-- Reproducible: the same graph, parameters and seed produce the same output.
-- Incremental: only recompute graph nodes affected by a change.
-- Progressive rendering: preview cheaply; spend more work only for final output.
+The former global low-resolution density-volume terrain is no longer used for the main mountain surface. It produced coarse vertical sampling and allowed arbitrary ellipsoid unions to create detached summit blobs. The density/SDF code is retained as experimental groundwork; volumetric geometry should be introduced only for localized features that need caves, arches or overhangs, not as a replacement for the entire heightfield.
 
-## Current status
+## Vegetation foundation
 
-**Phase 0 — Foundation:** repository initialized; architecture and first 2D prototype are being prepared.
+- Forest stands use broad and medium-scale habitat masks, clustered candidate placement and local spacing competition
+- Tree instances share a procedural tapered trunk and branching skeleton with individual leaf geometry
+- Tree orientation, crown width, height and tint vary deterministically by seed
+- Ground cover uses curved, tapered grass blades, fern fronds, low moss patches and small stones
+- Instanced rendering keeps geometry shared across many vegetation placements
+- Ground-cover candidates are sampled across the full world instead of stopping at an arbitrary scan-order limit
 
-## Development
+This is a procedural foundation, not a claim of final photorealism. Species-specific models, canopy/understory competition, vegetation LOD and wind animation remain future quality work.
 
-Requirements: Node.js 20+
+## Run locally
 
-```bash
+\`\`\`bash
 npm install
 npm run dev
+\`\`\`
+
+Open the root page. The production entry point is \`index.html\`.
+
+## Checks
+
+\`\`\`bash
+npm test
 npm run typecheck
 npm run build
-```
+\`\`\`
 
-## Research reference
+## Development sequence
 
-Aether studies the techniques used by [Abyssal Garden](https://github.com/Noniv/abyssal-garden), but does not copy its implementation wholesale. See [the technical study](docs/research/abyssal-garden.md) for the design decisions and proposed improvements.
+1. Stabilize the shared macro terrain and add localized volumetric features only where needed.
+2. Build believable forest stands, tree species, ground cover and vegetation LOD.
+3. Convert drainage into a connected river graph and continuous carved channels.
+4. Add atmosphere, lighting and depth-aware rendering.
+5. Validate fixed-seed scenes and optimize mobile quality tiers.
 
-## License
-
-MIT
+Every subsystem must use the same world coordinates and sample the authoritative terrain surface. Changes should pass deterministic/data-integrity tests before visual acceptance on a real device.
