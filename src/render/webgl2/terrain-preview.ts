@@ -252,33 +252,32 @@ function buildTreeGeometry(): Float32Array {
     nx/=len;ny/=len;nz/=len;
     for(const p of [a,b,c])out.push(p[0],p[1],p[2],nx,ny,nz);
   };
-  const tube=(a:number[],b:number[],ra:number,rb:number,segments=6)=>{
+  const smoothTri=(p0:number[],n0:number[],p1:number[],n1:number[],p2:number[],n2:number[])=>{
+    for(const [p,n] of [[p0,n0],[p1,n1],[p2,n2]] as const)out.push(p[0],p[1],p[2],n[0],n[1],n[2]);
+  };
+  const tube=(a:number[],b:number[],ra:number,rb:number,segments=10)=>{
     const axis=[b[0]-a[0],b[1]-a[1],b[2]-a[2]],length=Math.hypot(...axis)||1;
     const ux=axis[0]/length,uy=axis[1]/length,uz=axis[2]/length;
     const ref=Math.abs(uy)>0.92?[1,0,0]:[0,1,0];
     let vx=uy*ref[2]-uz*ref[1],vy=uz*ref[0]-ux*ref[2],vz=ux*ref[1]-uy*ref[0];
     const vl=Math.hypot(vx,vy,vz)||1;vx/=vl;vy/=vl;vz/=vl;
     const wx=uy*vz-uz*vy,wy=uz*vx-ux*vz,wz=ux*vy-uy*vx;
-    const smoothTri=(p0:number[],n0:number[],p1:number[],n1:number[],p2:number[],n2:number[])=>{
-      for(const [p,n] of [[p0,n0],[p1,n1],[p2,n2]] as const)out.push(p[0],p[1],p[2],n[0],n[1],n[2]);
-    };
     const ring=(center:number[],r:number,t:number)=>[center[0]+(vx*Math.cos(t)+wx*Math.sin(t))*r,center[1]+(vy*Math.cos(t)+wy*Math.sin(t))*r,center[2]+(vz*Math.cos(t)+wz*Math.sin(t))*r];
+    const radial=(t:number)=>normalize([vx*Math.cos(t)+wx*Math.sin(t),vy*Math.cos(t)+wy*Math.sin(t),vz*Math.cos(t)+wz*Math.sin(t)]);
     for(let i=0;i<segments;i++){
       const p=i/segments*Math.PI*2,q=(i+1)/segments*Math.PI*2;
-      const radial=(t:number)=>{const n=normalize([vx*Math.cos(t)+wx*Math.sin(t),vy*Math.cos(t)+wy*Math.sin(t),vz*Math.cos(t)+wz*Math.sin(t)]);return n;};
       const a0=ring(a,ra,p),a1=ring(a,ra,q),b0=ring(b,rb,p),b1=ring(b,rb,q);
       const np=radial(p),nq=radial(q);
       smoothTri(a0,np,b0,np,a1,nq);smoothTri(a1,nq,b0,np,b1,nq);
     }
   };
   const leaf=(base:number[],tip:number[],width:number,phase:number)=>{
-    const dx=tip[0]-base[0],dy=tip[1]-base[1],dz=tip[2]-base[2],len=Math.hypot(dx,dy,dz)||1;
-    const px=-dz/len,py=0,pz=dx/len;
+    const dx=tip[0]-base[0],dz=tip[2]-base[2],len=Math.hypot(dx,dz)||1;
+    const px=-dz/len,pz=dx/len;
     const mid=[(base[0]+tip[0])*0.5+Math.cos(phase)*width*0.18,(base[1]+tip[1])*0.5+0.018,(base[2]+tip[2])*0.5+Math.sin(phase)*width*0.18];
-    const left=[mid[0]+px*width,mid[1]+py*width,mid[2]+pz*width];
-    const right=[mid[0]-px*width,mid[1]-py*width,mid[2]-pz*width];
-    tri(base,left,tip);tri(tip,right,base);
-    tri(tip,left,base);tri(base,right,tip);
+    const left=[mid[0]+px*width,mid[1]+0.012,mid[2]+pz*width];
+    const right=[mid[0]-px*width,mid[1]-0.012,mid[2]-pz*width];
+    tri(base,left,tip);tri(tip,right,base);tri(tip,left,base);tri(base,right,tip);
   };
   const canopyBlob=(center:number[],radii:number[],phase:number)=>{
     const lat=4,lon=8,points:number[][]=[],normals:number[][]=[];
@@ -296,38 +295,26 @@ function buildTreeGeometry(): Float32Array {
       smoothTri(points[a],normals[a],points[c],normals[c],points[d],normals[d]);
     }
   };
-  // Overlapping, softly rounded foliage masses break up the angular branch-tip silhouette.
-  canopyBlob([-0.16,0.67,0.08],[0.19,0.20,0.18],0.4);
-  canopyBlob([0.15,0.72,-0.10],[0.21,0.22,0.19],1.7);
-  canopyBlob([0.02,0.86,0.03],[0.17,0.19,0.17],2.6);
-  canopyBlob([-0.02,0.52,-0.16],[0.16,0.16,0.17],3.2);
-  const treeMarkerActual=treeMarker;
-  if(!s.includes(treeMarkerActual))throw new Error("tree roots marker missing");
-  s=s.replace(treeMarkerActual,blob+treeMarkerActual);
-  // Shallow buttress roots flare from the trunk and sink slightly below the sampled ground.
-  // Their exposed shoulders visually anchor each tree to uneven terrain.
+
+  // Buttress roots and tapered branches use smooth radial normals to avoid a faceted trunk.
   for(let root=0;root<7;root++){
     const angle=root/7*Math.PI*2+0.19;
     const start=[Math.cos(angle)*0.035,0.105,Math.sin(angle)*0.035];
     const middle=[Math.cos(angle)*0.16,0.035,Math.sin(angle)*0.16];
     const tip=[Math.cos(angle)*0.30,-0.045,Math.sin(angle)*0.30];
-    tube(start,middle,0.034,0.022,8);
-    tube(middle,tip,0.022,0.0035,7);
+    tube(start,middle,0.034,0.022,8);tube(middle,tip,0.022,0.0035,7);
   }
-  // A tapered trunk and tiered, asymmetrical branches form the tree silhouette.
   const trunk0=[0,0,0],trunk1=[0.018,0.36,-0.008],trunk2=[-0.012,0.70,0.012],trunk3=[0.015,1,0];
   tube(trunk0,trunk1,0.075,0.052,14);tube(trunk1,trunk2,0.052,0.029,12);tube(trunk2,trunk3,0.029,0.008,10);
   for(let tier=0;tier<6;tier++){
     const y=0.30+tier*0.11;
     const center=[Math.sin(tier*1.7)*0.018,y,Math.cos(tier*1.3)*0.014];
-    const count=4;
-    for(let j=0;j<count;j++){
-      const angle=j/count*Math.PI*2+tier*1.91;
+    for(let j=0;j<4;j++){
+      const angle=j/4*Math.PI*2+tier*1.91;
       const length=(0.34-tier*0.032)*(0.82+0.18*Math.sin(j*4.1+tier));
       const end=[center[0]+Math.cos(angle)*length,y+length*(0.34+(j%2)*0.08),center[2]+Math.sin(angle)*length];
       const mid=[center[0]+Math.cos(angle)*length*0.52,y+length*0.18,center[2]+Math.sin(angle)*length*0.52];
-      tube(center,mid,0.027-tier*0.002,0.014-tier*0.001,5);
-      tube(mid,end,0.014-tier*0.001,0.0035,4);
+      tube(center,mid,0.027-tier*0.002,0.014-tier*0.001,7);tube(mid,end,0.014-tier*0.001,0.0035,6);
       const leafBase=[mid[0]+(end[0]-mid[0])*0.72,mid[1]+(end[1]-mid[1])*0.72,mid[2]+(end[2]-mid[2])*0.72];
       for(let l=0;l<2;l++){
         const phase=angle+(l===0?0.85:-0.85)+tier*0.73;
@@ -339,6 +326,11 @@ function buildTreeGeometry(): Float32Array {
       }
     }
   }
+  // Rounded overlapping foliage masses soften the crown silhouette and shade smoothly.
+  canopyBlob([-0.16,0.67,0.08],[0.19,0.20,0.18],0.4);
+  canopyBlob([0.15,0.72,-0.10],[0.21,0.22,0.19],1.7);
+  canopyBlob([0.02,0.86,0.03],[0.17,0.19,0.17],2.6);
+  canopyBlob([-0.02,0.52,-0.16],[0.16,0.16,0.17],3.2);
   return new Float32Array(out);
 }
 
