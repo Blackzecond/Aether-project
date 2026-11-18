@@ -279,73 +279,95 @@ function buildTreeGeometry(): Float32Array {
   const smoothTri=(p0:number[],n0:number[],p1:number[],n1:number[],p2:number[],n2:number[])=>{
     for(const [p,n] of [[p0,n0],[p1,n1],[p2,n2]] as const)out.push(p[0],p[1],p[2],n[0],n[1],n[2]);
   };
-  const tube=(a:number[],b:number[],ra:number,rb:number,segments=10)=>{
-    const axis=[b[0]-a[0],b[1]-a[1],b[2]-a[2]],length=Math.hypot(...axis)||1;
-    const ux=axis[0]/length,uy=axis[1]/length,uz=axis[2]/length;
-    const ref=Math.abs(uy)>0.92?[1,0,0]:[0,1,0];
-    let vx=uy*ref[2]-uz*ref[1],vy=uz*ref[0]-ux*ref[2],vz=ux*ref[1]-uy*ref[0];
-    const vl=Math.hypot(vx,vy,vz)||1;vx/=vl;vy/=vl;vz/=vl;
-    const wx=uy*vz-uz*vy,wy=uz*vx-ux*vz,wz=ux*vy-uy*vx;
-    const ring=(center:number[],r:number,t:number)=>[center[0]+(vx*Math.cos(t)+wx*Math.sin(t))*r,center[1]+(vy*Math.cos(t)+wy*Math.sin(t))*r,center[2]+(vz*Math.cos(t)+wz*Math.sin(t))*r];
-    const radial=(t:number)=>normalize([vx*Math.cos(t)+wx*Math.sin(t),vy*Math.cos(t)+wy*Math.sin(t),vz*Math.cos(t)+wz*Math.sin(t)]);
+  const tube=(a:number[],b:number[],ra:number,rb:number,segments=7)=>{
+    const axis=normalize(subtract(b,a));
+    const ref=Math.abs(axis[1])>0.92?[1,0,0]:[0,1,0];
+    const side=normalize(cross(axis,ref)),up=cross(axis,side);
+    const ring=(p:number[],r:number,t:number)=>p.map((v,k)=>v+(side[k]*Math.cos(t)+up[k]*Math.sin(t))*r);
+    const normal=(t:number)=>normalize(side.map((v,k)=>v*Math.cos(t)+up[k]*Math.sin(t)));
     for(let i=0;i<segments;i++){
       const p=i/segments*Math.PI*2,q=(i+1)/segments*Math.PI*2;
       const a0=ring(a,ra,p),a1=ring(a,ra,q),b0=ring(b,rb,p),b1=ring(b,rb,q);
-      const np=radial(p),nq=radial(q);
+      const np=normal(p),nq=normal(q);
       smoothTri(a0,np,b0,np,a1,nq);smoothTri(a1,nq,b0,np,b1,nq);
     }
   };
-  // Individual lance-shaped leaves replace the old ellipsoid canopy masses.
-  // Each leaf has a raised midrib and a tapered outline, with both sides visible.
+  // A gently cupped, pointed leaf surface with a raised midrib and a narrow tip.
   const leaf=(base:number[],tip:number[],width:number,phase:number)=>{
-    const dx=tip[0]-base[0],dy=tip[1]-base[1],dz=tip[2]-base[2];
-    const length=Math.hypot(dx,dy,dz)||1;
-    const axis=[dx/length,dy/length,dz/length];
-    const side=normalize(cross(axis,[Math.sin(phase),0.25,Math.cos(phase)]));
-    const up=normalize(cross(side,axis));
-    const center=[
-      (base[0]+tip[0])*0.5+up[0]*width*0.18,
-      (base[1]+tip[1])*0.5+up[1]*width*0.18,
-      (base[2]+tip[2])*0.5+up[2]*width*0.18,
-    ];
-    const left=center.map((v,k)=>v+side[k]*width);
-    const right=center.map((v,k)=>v-side[k]*width);
-    const front=normalize(cross(axis,side));
-    const raised=normalize([front[0]+up[0]*0.42,front[1]+up[1]*0.42,front[2]+up[2]*0.42]);
-    smoothTri(base,front,left,raised,tip,front);
-    smoothTri(base,front,tip,front,right,raised);
-    const back=front.map(v=>-v),backRaised=raised.map(v=>-v);
-    smoothTri(tip,back,left,backRaised,base,back);
-    smoothTri(right,backRaised,tip,back,base,back);
+    const axis=normalize(subtract(tip,base));
+    const side=normalize(cross(axis,[Math.sin(phase),0.28,Math.cos(phase)]));
+    const normal=normalize(cross(side,axis));
+    const sections=[0,0.28,0.58,0.82,1];
+    const rows=sections.map((t,i)=>{
+      const center=base.map((v,k)=>v+(tip[k]-v)*t+normal[k]*Math.sin(Math.PI*t)*width*0.16);
+      const w=width*Math.pow(Math.sin(Math.PI*t),0.82)*(i===0||i===4?0.035:1);
+      const ridge=center.map((v,k)=>v+normal[k]*width*0.12);
+      return {left:center.map((v,k)=>v+side[k]*w),right:center.map((v,k)=>v-side[k]*w),ridge};
+    });
+    for(let i=0;i<rows.length-1;i++){
+      const a=rows[i],b=rows[i+1];
+      smoothTri(a.left,normal,a.ridge,normal,b.left,normal);
+      smoothTri(a.ridge,normal,b.ridge,normal,b.left,normal);
+      smoothTri(a.ridge,normal,a.right,normal,b.ridge,normal);
+      smoothTri(a.right,normal,b.right,normal,b.ridge,normal);
+      const back=normal.map(v=>-v);
+      smoothTri(b.left,back,a.ridge,back,a.left,back);
+      smoothTri(b.left,back,b.ridge,back,a.ridge,back);
+      smoothTri(b.ridge,back,a.right,back,b.right,back);
+      smoothTri(b.ridge,back,a.right,back,b.ridge,back);
+    }
   };
-  // Buttress roots and tapered branches use smooth radial normals to avoid a faceted trunk.
-  for(let root=0;root<5;root++){
-    const angle=root/7*Math.PI*2+0.19;
-    const start=[Math.cos(angle)*0.035,0.105,Math.sin(angle)*0.035];
-    const middle=[Math.cos(angle)*0.16,0.035,Math.sin(angle)*0.16];
-    const tip=[Math.cos(angle)*0.30,-0.045,Math.sin(angle)*0.30];
-    tube(start,middle,0.034,0.022,6);tube(middle,tip,0.022,0.0035,5);
+  const hash=(n:number)=>{const x=Math.sin(n*127.1+19.19)*43758.5453;return x-Math.floor(x);};
+  const addFoliageCluster=(center:number[],size:number,seed:number)=>{
+    // Leaves fan out in several directions and occupy different depths, avoiding a single solid crown blob.
+    const count=9;
+    for(let i=0;i<count;i++){
+      const h=hash(seed*17+i*3.1),angle=i/count*Math.PI*2+hash(seed+i)*0.7;
+      const elevation=-0.18+h*0.88;
+      const radial=size*(0.48+h*0.34);
+      const base=[center[0]+Math.cos(angle)*radial*0.22,center[1]+(h-0.5)*size*0.28,center[2]+Math.sin(angle)*radial*0.22];
+      const tip=[center[0]+Math.cos(angle)*radial,center[1]+elevation*size+size*0.12,center[2]+Math.sin(angle)*radial];
+      leaf(base,tip,size*(0.105+h*0.025),angle+i*0.31);
+    }
+  };
+  let branchId=1;
+  const growBranch=(origin:number[],direction:number[],length:number,radius:number,depth:number,seed:number)=>{
+    const dir=normalize(direction);
+    const end=origin.map((v,k)=>v+dir[k]*length);
+    tube(origin,end,radius,Math.max(0.0012,radius*0.62),depth===0?8:6);
+    if(depth===0){addFoliageCluster(end,length*0.43,seed);return;}
+    const side=normalize(cross(dir,[Math.sin(seed*2.13),0.24,Math.cos(seed*1.71)]));
+    const up=normalize(cross(side,dir));
+    const children=depth===2?3:2;
+    for(let i=0;i<children;i++){
+      const spread=(i-(children-1)*0.5)*0.72;
+      const twist=seed*2.399+i*2.399;
+      const lateral=side.map((v,k)=>v*Math.cos(twist)+up[k]*Math.sin(twist));
+      const childDir=normalize(dir.map((v,k)=>v*0.60+lateral[k]*(0.66+Math.abs(spread)*0.16)+up[k]*(0.12+hash(seed+i)*0.12)));
+      const childOrigin=origin.map((v,k)=>v+(end[k]-v)*(0.48+i*0.10));
+      growBranch(childOrigin,childDir,length*(0.62+hash(seed*3+i)*0.12),radius*0.62,depth-1,branchId++);
+    }
+  };
+  // Flared roots merge into a subtly curved trunk.
+  for(let i=0;i<7;i++){
+    const a=i/7*Math.PI*2+0.17,dx=Math.cos(a),dz=Math.sin(a);
+    tube([dx*0.025,0.12,dz*0.025],[dx*0.13,0.035,dz*0.13],0.027,0.013,6);
+    tube([dx*0.13,0.035,dz*0.13],[dx*0.23,-0.035,dz*0.23],0.013,0.0018,5);
   }
-  const trunk0=[0,0,0],trunk1=[0.018,0.36,-0.008],trunk2=[-0.012,0.70,0.012],trunk3=[0.015,1,0];
-  tube(trunk0,trunk1,0.075,0.052,10);tube(trunk1,trunk2,0.052,0.029,9);tube(trunk2,trunk3,0.029,0.008,8);
-  for(let tier=0;tier<4;tier++){
-    const y=0.34+tier*0.15;
-    const center=[Math.sin(tier*1.7)*0.018,y,Math.cos(tier*1.3)*0.014];
-    for(let j=0;j<3;j++){
-      const angle=j/3*Math.PI*2+tier*1.91;
-      const length=(0.34-tier*0.035)*(0.82+0.18*Math.sin(j*4.1+tier));
-      const end=[center[0]+Math.cos(angle)*length,y+length*(0.34+(j%2)*0.08),center[2]+Math.sin(angle)*length];
-      const mid=[center[0]+Math.cos(angle)*length*0.52,y+length*0.18,center[2]+Math.sin(angle)*length*0.52];
-      tube(center,mid,0.027-tier*0.002,0.014-tier*0.001,5);tube(mid,end,0.014-tier*0.001,0.0035,4);
-      const clusterCenter=[end[0],end[1]+0.018,end[2]];
-      // Three separate leaves radiate from each twig tip, leaving gaps in the crown silhouette.
-      for(let l=0;l<3;l++){
-        const phase=angle+l*Math.PI*2/3+tier*0.73;
-        leaf(clusterCenter,[clusterCenter[0]+Math.cos(phase)*0.078,clusterCenter[1]+0.038+(l===1?0.018:0),clusterCenter[2]+Math.sin(phase)*0.078],0.027,phase+0.4);
-      }
+  const trunk=[[0,0,0],[0.012,0.25,-0.006],[-0.009,0.52,0.008],[0.014,0.77,0.002],[0.018,1,0]];
+  for(let i=0;i<trunk.length-1;i++)tube(trunk[i],trunk[i+1],0.067-i*0.014,0.053-i*0.014,10);
+  // Five staggered whorls of primary branches, each recursively splitting into secondary and tertiary limbs.
+  for(let tier=0;tier<5;tier++){
+    const y=0.30+tier*0.135;
+    const trunkPoint=[Math.sin(tier*1.31)*0.012,y,Math.cos(tier*1.73)*0.009];
+    const count=tier===4?4:5;
+    for(let j=0;j<count;j++){
+      const angle=j/count*Math.PI*2+tier*2.17;
+      const length=(0.36-tier*0.035)*(0.82+hash(tier*11+j)*0.24);
+      const direction=[Math.cos(angle)*0.82,0.42+hash(j+tier*7)*0.18,Math.sin(angle)*0.82];
+      growBranch(trunkPoint,direction,length,0.026-tier*0.003,2,tier*13+j+1);
     }
   }
-  // The crown is made only from visible branches and leaf clusters; no spherical canopy fill.
   return new Float32Array(out);
 }
 
