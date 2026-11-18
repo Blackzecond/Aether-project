@@ -254,16 +254,16 @@ function buildTreeGeometry(): Float32Array {
     const mid=[(base[0]+tip[0])*0.5+Math.cos(phase)*width*0.18,(base[1]+tip[1])*0.5+0.018,(base[2]+tip[2])*0.5+Math.sin(phase)*width*0.18];
     const left=[mid[0]+px*width,mid[1]+py*width,mid[2]+pz*width];
     const right=[mid[0]-px*width,mid[1]-py*width,mid[2]-pz*width];
-    tri(base,left,mid);tri(left,tip,mid);tri(tip,right,mid);tri(right,base,mid);
-    tri(mid,left,base);tri(mid,tip,left);tri(mid,right,tip);tri(mid,base,right);
+    tri(base,left,tip);tri(tip,right,base);
+    tri(tip,left,base);tri(base,right,tip);
   };
   // A tapered trunk and tiered, asymmetrical branches form the tree silhouette.
   const trunk0=[0,0,0],trunk1=[0.018,0.36,-0.008],trunk2=[-0.012,0.70,0.012],trunk3=[0.015,1,0];
   tube(trunk0,trunk1,0.075,0.052,8);tube(trunk1,trunk2,0.052,0.029,7);tube(trunk2,trunk3,0.029,0.008,6);
-  for(let tier=0;tier<7;tier++){
-    const y=0.28+tier*0.095;
+  for(let tier=0;tier<6;tier++){
+    const y=0.30+tier*0.11;
     const center=[Math.sin(tier*1.7)*0.018,y,Math.cos(tier*1.3)*0.014];
-    const count=tier<3?5:4;
+    const count=4;
     for(let j=0;j<count;j++){
       const angle=j/count*Math.PI*2+tier*1.91;
       const length=(0.34-tier*0.032)*(0.82+0.18*Math.sin(j*4.1+tier));
@@ -271,18 +271,14 @@ function buildTreeGeometry(): Float32Array {
       const mid=[center[0]+Math.cos(angle)*length*0.52,y+length*0.18,center[2]+Math.sin(angle)*length*0.52];
       tube(center,mid,0.027-tier*0.002,0.014-tier*0.001,5);
       tube(mid,end,0.014-tier*0.001,0.0035,4);
-      for(let k=0;k<3;k++){
-        const t=0.58+k*0.17,base=[mid[0]+(end[0]-mid[0])*t,mid[1]+(end[1]-mid[1])*t,mid[2]+(end[2]-mid[2])*t];
-        for(let l=0;l<3;l++){
-          const phase=angle+l*2.094+tier*0.73;
-          const tip=[base[0]+Math.cos(phase)*0.085,base[1]+0.045+(l%2)*0.018,base[2]+Math.sin(phase)*0.085];
-          leaf(base,tip,0.026,phase);
-        }
+      const leafBase=[mid[0]+(end[0]-mid[0])*0.72,mid[1]+(end[1]-mid[1])*0.72,mid[2]+(end[2]-mid[2])*0.72];
+      for(let l=0;l<2;l++){
+        const phase=angle+(l===0?0.85:-0.85)+tier*0.73;
+        leaf(leafBase,[leafBase[0]+Math.cos(phase)*0.085,leafBase[1]+0.045,leafBase[2]+Math.sin(phase)*0.085],0.026,phase);
       }
-      const leafBase=end;
-      for(let l=0;l<4;l++){
-        const phase=angle+l*Math.PI*0.5;
-        leaf(leafBase,[end[0]+Math.cos(phase)*0.095,end[1]+0.055,end[2]+Math.sin(phase)*0.095],0.032,phase);
+      for(let l=0;l<3;l++){
+        const phase=angle+l*Math.PI*2/3+tier*0.61;
+        leaf(end,[end[0]+Math.cos(phase)*0.095,end[1]+0.055,end[2]+Math.sin(phase)*0.095],0.032,phase);
       }
     }
   }
