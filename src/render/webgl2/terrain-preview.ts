@@ -189,6 +189,10 @@ function buildGroundCoverGeometry(): GroundGeometryData {
     const range=ranges[kind];if(range.count===0)range.first=out.length/7;range.count+=3;
     for(const p of [a,b,c])out.push(p[0],p[1],p[2],nx,ny,nz,kind);
   };
+  const smoothTri=(a:number[],na:number[],b:number[],nb:number[],c:number[],nc:number[],kind:number)=>{
+    const range=ranges[kind];if(range.count===0)range.first=out.length/7;range.count+=3;
+    for(const [p,n] of [[a,na],[b,nb],[c,nc]] as const)out.push(p[0],p[1],p[2],n[0],n[1],n[2],kind);
+  };
   const blade=(angle:number,width:number,height:number,bend:number,kind:number,rootX=0,rootZ=0)=>{
     const dx=Math.cos(angle),dz=Math.sin(angle),px=-dz,pz=dx,steps=4;
     for(let i=0;i<steps;i++){
@@ -199,8 +203,10 @@ function buildGroundCoverGeometry(): GroundGeometryData {
       const cx0=dx*curve(t0),cz0=dz*curve(t0),cx1=dx*curve(t1),cz1=dz*curve(t1);
       const a=[rootX+cx0-px*w0,y0,rootZ+cz0-pz*w0],b=[rootX+cx0+px*w0,y0,rootZ+cz0+pz*w0];
       const c=[rootX+cx1+px*w1,y1,rootZ+cz1+pz*w1],d=[rootX+cx1-px*w1,y1,rootZ+cz1-pz*w1];
-      tri(a,b,c,kind);tri(a,c,d,kind);
-      tri(c,b,a,kind);tri(d,c,a,kind);
+      const normal=(t:number)=>{const n=[dx,-(2*bend*t/Math.max(height,0.001)),dz],len=Math.hypot(...n)||1;return n.map(v=>v/len);};
+      const n0=normal(t0),n1=normal(t1),reverse0=n0.map(v=>-v),reverse1=n1.map(v=>-v);
+      smoothTri(a,n0,b,n0,c,n1,kind);smoothTri(a,n0,c,n1,d,n1,kind);
+      smoothTri(c,reverse1,b,reverse0,a,reverse0,kind);smoothTri(d,reverse1,c,reverse1,a,reverse0,kind);
     }
   };
   // Grass blades are curved, tapered strips, with varied azimuth and lean.
@@ -219,10 +225,18 @@ function buildGroundCoverGeometry(): GroundGeometryData {
     }
     const p=stem(1),q=stem(0.78);tri(q,[p[0],p[1]+0.10,p[2]],p,1);
   }
-  // Moss is a low, softly irregular ground patch.
-  const center=[0,0.045,0],ring:number[][]=[];
-  for(let i=0;i<12;i++){const a=i/12*Math.PI*2,r=0.42+(i%3)*0.045;ring.push([Math.cos(a)*r,0.035+(i%2)*0.018,Math.sin(a)*r]);}
-  for(let i=0;i<ring.length;i++)tri(center,ring[i],ring[(i+1)%ring.length],2);
+  // Moss is a shallow, smoothly shaded cushion rather than a flat polygon fan.
+  const mossPoint=(u:number,v:number)=>{
+    const phi=(v/4)*Math.PI*0.5,theta=(u/10)*Math.PI*2;
+    const ripple=1+0.055*Math.sin(theta*3.0+phi*4.0);
+    return [Math.cos(theta)*Math.sin(phi)*0.48*ripple,0.018+Math.cos(phi)*0.075*ripple,Math.sin(theta)*Math.sin(phi)*0.44*ripple];
+  };
+  for(let v=0;v<4;v++)for(let u=0;u<10;u++){
+    const a=mossPoint(u,v),b=mossPoint(u+1,v),c=mossPoint(u+1,v+1),d=mossPoint(u,v+1);
+    const normal=(p:number[])=>{const n=[p[0]/0.48,(p[1]-0.018)/0.075,p[2]/0.44],len=Math.hypot(...n)||1;return n.map(x=>x/len);};
+    smoothTri(a,normal(a),b,normal(b),c,normal(c),2);
+    smoothTri(a,normal(a),c,normal(c),d,normal(d),2);
+  }
   // Small grounded stones with a faceted, low profile.
   const rockRing=[[0.52,0.13,0.05],[0.26,0.16,0.43],[-0.34,0.12,0.40],[-0.53,0.11,-0.20],[-0.10,0.18,-0.48],[0.38,0.13,-0.36]];
   const top=[0.02,0.25,0.01],bottom=[-0.02,0.015,-0.01];
@@ -266,6 +280,30 @@ function buildTreeGeometry(): Float32Array {
     tri(base,left,tip);tri(tip,right,base);
     tri(tip,left,base);tri(base,right,tip);
   };
+  const canopyBlob=(center:number[],radii:number[],phase:number)=>{
+    const lat=4,lon=8,points:number[][]=[],normals:number[][]=[];
+    for(let y=0;y<=lat;y++)for(let x=0;x<=lon;x++){
+      const phi=0.08+(y/lat)*(Math.PI-0.16),theta=(x/lon)*Math.PI*2+phase;
+      const wobble=1+0.075*Math.sin(theta*3.0+phase)*Math.sin(phi*2.0)+0.035*Math.cos(theta*5.0-phase);
+      const unit=[Math.sin(phi)*Math.cos(theta),Math.cos(phi),Math.sin(phi)*Math.sin(theta)];
+      points.push([center[0]+unit[0]*radii[0]*wobble,center[1]+unit[1]*radii[1]*wobble,center[2]+unit[2]*radii[2]*wobble]);
+      const n=[unit[0]/radii[0],unit[1]/radii[1],unit[2]/radii[2]],length=Math.hypot(...n)||1;
+      normals.push(n.map(v=>v/length));
+    }
+    for(let y=0;y<lat;y++)for(let x=0;x<lon;x++){
+      const a=y*(lon+1)+x,b=a+1,d=(y+1)*(lon+1)+x,c=d+1;
+      smoothTri(points[a],normals[a],points[b],normals[b],points[c],normals[c]);
+      smoothTri(points[a],normals[a],points[c],normals[c],points[d],normals[d]);
+    }
+  };
+  // Overlapping, softly rounded foliage masses break up the angular branch-tip silhouette.
+  canopyBlob([-0.16,0.67,0.08],[0.19,0.20,0.18],0.4);
+  canopyBlob([0.15,0.72,-0.10],[0.21,0.22,0.19],1.7);
+  canopyBlob([0.02,0.86,0.03],[0.17,0.19,0.17],2.6);
+  canopyBlob([-0.02,0.52,-0.16],[0.16,0.16,0.17],3.2);
+  const treeMarkerActual=treeMarker;
+  if(!s.includes(treeMarkerActual))throw new Error("tree roots marker missing");
+  s=s.replace(treeMarkerActual,blob+treeMarkerActual);
   // Shallow buttress roots flare from the trunk and sink slightly below the sampled ground.
   // Their exposed shoulders visually anchor each tree to uneven terrain.
   for(let root=0;root<7;root++){
@@ -409,7 +447,6 @@ export class TerrainPreviewRenderer {
   private readonly groundGeometryRanges:readonly {first:number;count:number}[];
   private groundKindStarts=[0,0,0,0];
   private groundKindCounts=[0,0,0,0];
-  private groundVertexCount = 0;
   private groundCount = 0;
   private treeCount = 0;
   private treeInstanceData = new Float32Array(0);
@@ -489,7 +526,7 @@ export class TerrainPreviewRenderer {
     const groundVao=gl.createVertexArray(),groundGeometry=gl.createBuffer(),groundInstances=gl.createBuffer();
     if(!groundVao||!groundGeometry||!groundInstances)throw new Error("ไม่สามารถจองหน่วยความจำพืชพื้นได้");
     this.groundVao=groundVao;this.groundGeometryBuffer=groundGeometry;this.groundInstanceBuffer=groundInstances;
-    const groundGeometryData=buildGroundCoverGeometry();this.groundVertexCount=groundGeometryData.data.length/7;this.groundGeometryRanges=groundGeometryData.ranges;
+    const groundGeometryData=buildGroundCoverGeometry();this.groundGeometryRanges=groundGeometryData.ranges;
     gl.bindVertexArray(groundVao);gl.bindBuffer(gl.ARRAY_BUFFER,groundGeometry);gl.bufferData(gl.ARRAY_BUFFER,groundGeometryData.data,gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,28,0);
     gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,3,gl.FLOAT,false,28,12);
