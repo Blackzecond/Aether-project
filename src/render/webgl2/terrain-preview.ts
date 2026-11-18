@@ -249,7 +249,7 @@ function buildGroundCoverGeometry(): GroundGeometryData {
     const a=i*Math.PI/2+0.22,dx=Math.cos(a),dz=Math.sin(a),px=-dz,pz=dx;
     const stem=(t:number)=>[dx*t*0.62,0.05+Math.sin(t*Math.PI)*0.24+t*0.25,dz*t*0.62];
     for(let j=0;j<4;j++){
-      const t=0.14+j*0.19,p=stem(t),q=stem(Math.min(1,t+0.15)),leaf=0.105*(1-t*0.45);
+      const t=0.14+j*0.19,p=stem(t),leaf=0.105*(1-t*0.45);
       fernLeaf(p,[px*leaf*1.45,-0.012,pz*leaf*1.45],leaf*0.30,[dx,dz]);
       fernLeaf(p,[-px*leaf*1.45,-0.012,-pz*leaf*1.45],leaf*0.30,[dx,dz]);
     }
