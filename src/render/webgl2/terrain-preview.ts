@@ -327,23 +327,6 @@ function buildTreeGeometry(): Float32Array {
       smoothTri(c,back,b,back,a,back);smoothTri(c,backMid,d,backMid,b,back);
     }
   };
-  const canopyBlob=(center:number[],radii:number[],phase:number)=>{
-    const lat=4,lon=8,points:number[][]=[],normals:number[][]=[];
-    for(let y=0;y<=lat;y++)for(let x=0;x<=lon;x++){
-      const phi=0.08+(y/lat)*(Math.PI-0.16),theta=(x/lon)*Math.PI*2+phase;
-      const wobble=1+0.075*Math.sin(theta*3.0+phase)*Math.sin(phi*2.0)+0.035*Math.cos(theta*5.0-phase);
-      const unit=[Math.sin(phi)*Math.cos(theta),Math.cos(phi),Math.sin(phi)*Math.sin(theta)];
-      points.push([center[0]+unit[0]*radii[0]*wobble,center[1]+unit[1]*radii[1]*wobble,center[2]+unit[2]*radii[2]*wobble]);
-      const n=[unit[0]/radii[0],unit[1]/radii[1],unit[2]/radii[2]],length=Math.hypot(...n)||1;
-      normals.push(n.map(v=>v/length));
-    }
-    for(let y=0;y<lat;y++)for(let x=0;x<lon;x++){
-      const a=y*(lon+1)+x,b=a+1,d=(y+1)*(lon+1)+x,c=d+1;
-      smoothTri(points[a],normals[a],points[b],normals[b],points[c],normals[c]);
-      smoothTri(points[a],normals[a],points[c],normals[c],points[d],normals[d]);
-    }
-  };
-
   // Buttress roots and tapered branches use smooth radial normals to avoid a faceted trunk.
   for(let root=0;root<5;root++){
     const angle=root/7*Math.PI*2+0.19;
@@ -1014,7 +997,6 @@ export class TerrainPreviewRenderer {
     const focus=exploring?camera:this.cameraTarget;
     const treeRadius=exploring?0.28:1.18;
     const groundRadius=exploring?0.20:(this.distance<this.fitDistance*0.65?1.15:0.82);
-    const treeRadiusSquared=treeRadius*treeRadius,groundRadiusSquared=groundRadius*groundRadius;
     const treeCursor=collectVisibleInstances(this.treeInstanceData,this.treeSpatialBins,focus,treeRadius,this.treeVisibleData);
     const treeDrawCount=treeCursor/6;
     gl.bindBuffer(gl.ARRAY_BUFFER,this.treeInstanceBuffer);
