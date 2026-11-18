@@ -214,6 +214,31 @@ function buildGroundCoverGeometry(): GroundGeometryData {
       smoothTri(c,reverse1,b,reverse0,a,reverse0,kind);smoothTri(d,reverse1,c,reverse1,a,reverse0,kind);
     }
   };
+  const fernLeaf=(base:number[],side:number[],width:number,stemDirection:number[])=>{
+    const sideLength=Math.hypot(...side)||1,sideDir=side.map(v=>v/sideLength);
+    const widthAxis=normalize([stemDirection[0],0.32,stemDirection[1]]);
+    const normal=normalize([
+      sideDir[1]*widthAxis[2]-sideDir[2]*widthAxis[1],
+      sideDir[2]*widthAxis[0]-sideDir[0]*widthAxis[2],
+      sideDir[0]*widthAxis[1]-sideDir[1]*widthAxis[0],
+    ]);
+    const section=(t:number)=>{
+      const center=[base[0]+sideDir[0]*sideLength*t,base[1]+Math.sin(Math.PI*t)*0.018,base[2]+sideDir[2]*sideLength*t];
+      const w=width*Math.sin(Math.PI*t);
+      return {
+        left:center.map((v,i)=>v+widthAxis[i]*w),
+        right:center.map((v,i)=>v-widthAxis[i]*w),
+      };
+    };
+    for(let i=0;i<2;i++){
+      const a=section(i/2),b=section((i+1)/2);
+      smoothTri(a.left,normal,a.right,normal,b.left,normal,1);
+      smoothTri(a.right,normal,b.right,normal,b.left,normal,1);
+      const back=normal.map(v=>-v);
+      smoothTri(b.left,back,a.right,back,a.left,back,1);
+      smoothTri(b.left,back,b.right,back,a.right,back,1);
+    }
+  };
   // Grass blades are curved, tapered strips, with varied azimuth and lean.
   for(let i=0;i<4;i++){
     const a=i*Math.PI*0.5+0.31,r=0.12+(i%2)*0.12;
@@ -225,8 +250,8 @@ function buildGroundCoverGeometry(): GroundGeometryData {
     const stem=(t:number)=>[dx*t*0.62,0.05+Math.sin(t*Math.PI)*0.24+t*0.25,dz*t*0.62];
     for(let j=0;j<4;j++){
       const t=0.14+j*0.19,p=stem(t),q=stem(Math.min(1,t+0.15)),leaf=0.105*(1-t*0.45);
-      tri(p,[p[0]+px*leaf,p[1]+0.035,p[2]+pz*leaf],q,1);
-      tri(p,[p[0]-px*leaf,p[1]+0.035,p[2]-pz*leaf],q,1);
+      fernLeaf(p,[px*leaf*1.45,-0.012,pz*leaf*1.45],leaf*0.30,[dx,dz]);
+      fernLeaf(p,[-px*leaf*1.45,-0.012,-pz*leaf*1.45],leaf*0.30,[dx,dz]);
     }
     const p=stem(1),q=stem(0.78);tri(q,[p[0],p[1]+0.10,p[2]],p,1);
   }
