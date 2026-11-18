@@ -82,7 +82,7 @@ vec3 terrainColor(float height, float slope) {
   float exposedRock = smoothstep(0.24, 0.68, slope);
   float highRock = smoothstep(0.58, 0.82, height);
   color = mix(color, weatheredRock, exposedRock * (0.48 + highRock * 0.30));
-  float soilPatches = fbm2(vec2(height * 17.0, vPosition.x * 23.0 + vPosition.z * 19.0));
+  float soilPatches = noise2(vec2(height * 17.0, vPosition.x * 23.0 + vPosition.z * 19.0));
   color = mix(color, earth * (0.88 + soilPatches * 0.22),
     (1.0 - exposedRock) * smoothstep(0.38, 0.70, height) * 0.42);
   return color;
@@ -110,30 +110,26 @@ void main() {
     vec3 base = terrainColor(height, slope);
     vec2 texCoord = vPosition.xz;
     float grassSuitability=(1.0-smoothstep(0.30,0.58,height))*(1.0-smoothstep(0.12,0.52,slope))*smoothstep(0.018,0.10,height);
+    float cameraDistance=length(vPosition-uCameraPosition);
+    bool distant=cameraDistance>1.35;
     float meadowPatch=fbm2(texCoord*5.2+vec2(13.7,4.1));
-    float meadowDetail=fbm2(texCoord*28.0+vec2(2.3,17.9));
-    float grassGrain=noise2(texCoord*260.0+vec2(meadowDetail*3.0,meadowPatch*2.0));
+    float meadowDetail=distant?meadowPatch:fbm2(texCoord*28.0+vec2(2.3,17.9));
+    float grassGrain=distant?0.5:noise2(texCoord*260.0+vec2(meadowDetail*3.0,meadowPatch*2.0));
     vec3 meadowColor=mix(vec3(0.16,0.29,0.105),vec3(0.31,0.43,0.16),meadowPatch*0.72+meadowDetail*0.28);
     meadowColor*=0.91+grassGrain*0.16;
     float meadowCoverage=grassSuitability*(0.48+smoothstep(0.30,0.68,meadowPatch)*0.44);
     base=mix(base,meadowColor,meadowCoverage);
-    float broadTexture = fbm2(texCoord * 18.0);
-    float stoneGrain = fbm2(texCoord * 74.0);
-    float fineGrain = noise2(texCoord * 190.0);
-    float rockExposure = smoothstep(0.34, 0.68, slope);
-    float striation = 1.0 - abs(noise2(texCoord * 31.0 + vec2(height * 7.0, height * 3.0)) * 2.0 - 1.0);
-    vec3 earthTint = vec3(0.78, 0.76, 0.65) * (0.82 + broadTexture * 0.32);
-    vec3 rockTint = vec3(0.68, 0.66, 0.59) * (0.76 + broadTexture * 0.42);
-    rockTint *= 0.91 + striation * 0.12;
-    base = mix(base * (0.88 + broadTexture * 0.24), earthTint, (1.0 - rockExposure) * 0.12);
-    base = mix(base, rockTint, rockExposure * 0.58);
-    base *= 0.94 + stoneGrain * 0.12 + fineGrain * 0.035;
-    float bumpStep = 0.003;
-    vec2 bumpGradient = vec2(
-      fbm2((texCoord + vec2(bumpStep, 0.0)) * 74.0) - stoneGrain,
-      fbm2((texCoord + vec2(0.0, bumpStep)) * 74.0) - stoneGrain
-    ) / bumpStep;
-    n = normalize(n - vec3(bumpGradient.x, 0.0, bumpGradient.y) * 0.0009 * rockExposure);
+    float broadTexture=distant?noise2(texCoord*5.0):fbm2(texCoord*18.0);
+    float stoneGrain=distant?0.5:fbm2(texCoord*74.0);
+    float fineGrain=distant?0.5:noise2(texCoord*190.0);
+    float rockExposure=smoothstep(0.34,0.68,slope);
+    float striation=distant?0.5:1.0-abs(noise2(texCoord*31.0+vec2(height*7.0,height*3.0))*2.0-1.0);
+    vec3 earthTint=vec3(0.78,0.76,0.65)*(0.82+broadTexture*0.32);
+    vec3 rockTint=vec3(0.68,0.66,0.59)*(0.76+broadTexture*0.42);
+    rockTint*=0.91+striation*0.12;
+    base=mix(base*(0.88+broadTexture*0.24),earthTint,(1.0-rockExposure)*0.12);
+    base=mix(base,rockTint,rockExposure*0.58);
+    base*=0.94+stoneGrain*0.12+fineGrain*0.035;
     vec3 lightDirection = normalize(vec3(-0.55, 0.82, 0.42));
     vec3 viewDirection = normalize(uCameraPosition - vPosition);
     vec3 halfDirection = normalize(lightDirection + viewDirection);
@@ -265,6 +261,16 @@ function buildTreeGeometry(): Float32Array {
     tri(base,left,tip);tri(tip,right,base);
     tri(tip,left,base);tri(base,right,tip);
   };
+  // Shallow buttress roots flare from the trunk and sink slightly below the sampled ground.
+  // Their exposed shoulders visually anchor each tree to uneven terrain.
+  for(let root=0;root<7;root++){
+    const angle=root/7*Math.PI*2+0.19;
+    const start=[Math.cos(angle)*0.035,0.105,Math.sin(angle)*0.035];
+    const middle=[Math.cos(angle)*0.16,0.035,Math.sin(angle)*0.16];
+    const tip=[Math.cos(angle)*0.30,-0.045,Math.sin(angle)*0.30];
+    tube(start,middle,0.034,0.022,5);
+    tube(middle,tip,0.022,0.0035,5);
+  }
   // A tapered trunk and tiered, asymmetrical branches form the tree silhouette.
   const trunk0=[0,0,0],trunk1=[0.018,0.36,-0.008],trunk2=[-0.012,0.70,0.012],trunk3=[0.015,1,0];
   tube(trunk0,trunk1,0.075,0.052,8);tube(trunk1,trunk2,0.052,0.029,7);tube(trunk2,trunk3,0.029,0.008,6);
@@ -887,32 +893,29 @@ export class TerrainPreviewRenderer {
       gl.drawElements(gl.TRIANGLES,activeLod?.indexCount??this.triangleCount,gl.UNSIGNED_INT,0);
     }
     gl.bindVertexArray(null);
-    let treeDrawCount=this.treeCount,groundDrawCount=this.groundCount;
-    if(exploring){
-      let treeCursor=0;
-      for(let i=0;i<this.treeCount;i++){
-        const source=i*6,dx=this.treeInstanceData[source]-camera[0],dz=this.treeInstanceData[source+2]-camera[2];
-        if(dx*dx+dz*dz>0.28*0.28)continue;
-        for(let j=0;j<6;j++)this.treeVisibleData[treeCursor++]=this.treeInstanceData[source+j];
-      }
-      treeDrawCount=treeCursor/6;
-      gl.bindBuffer(gl.ARRAY_BUFFER,this.treeInstanceBuffer);
-      gl.bufferData(gl.ARRAY_BUFFER,this.treeVisibleData.subarray(0,treeCursor),gl.DYNAMIC_DRAW);
-      let groundCursor=0;
-      for(let i=0;i<this.groundCount;i++){
-        const source=i*6,dx=this.groundInstanceData[source]-camera[0],dz=this.groundInstanceData[source+2]-camera[2];
-        if(dx*dx+dz*dz>0.22*0.22)continue;
-        for(let j=0;j<6;j++)this.groundVisibleData[groundCursor++]=this.groundInstanceData[source+j];
-      }
-      groundDrawCount=groundCursor/6;
-      gl.bindBuffer(gl.ARRAY_BUFFER,this.groundInstanceBuffer);
-      gl.bufferData(gl.ARRAY_BUFFER,this.groundVisibleData.subarray(0,groundCursor),gl.DYNAMIC_DRAW);
-      this.instanceBuffersCulled=true;
-    }else if(this.instanceBuffersCulled){
-      gl.bindBuffer(gl.ARRAY_BUFFER,this.treeInstanceBuffer);gl.bufferData(gl.ARRAY_BUFFER,this.treeInstanceData,gl.STATIC_DRAW);
-      gl.bindBuffer(gl.ARRAY_BUFFER,this.groundInstanceBuffer);gl.bufferData(gl.ARRAY_BUFFER,this.groundInstanceData,gl.STATIC_DRAW);
-      this.instanceBuffersCulled=false;
+    // CPU-side instance culling keeps the GPU from processing distant grass blades.
+    // World view keeps a broad tree horizon but only detailed ground cover near the camera.
+    const treeRadius=exploring?0.28:2.45,groundRadius=exploring?0.22:1.35;
+    const treeRadiusSquared=treeRadius*treeRadius,groundRadiusSquared=groundRadius*groundRadius;
+    let treeCursor=0;
+    for(let i=0;i<this.treeCount;i++){
+      const source=i*6,dx=this.treeInstanceData[source]-camera[0],dz=this.treeInstanceData[source+2]-camera[2];
+      if(dx*dx+dz*dz>treeRadiusSquared)continue;
+      for(let j=0;j<6;j++)this.treeVisibleData[treeCursor++]=this.treeInstanceData[source+j];
     }
+    const treeDrawCount=treeCursor/6;
+    gl.bindBuffer(gl.ARRAY_BUFFER,this.treeInstanceBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER,this.treeVisibleData.subarray(0,treeCursor),gl.DYNAMIC_DRAW);
+    let groundCursor=0;
+    for(let i=0;i<this.groundCount;i++){
+      const source=i*6,dx=this.groundInstanceData[source]-camera[0],dz=this.groundInstanceData[source+2]-camera[2];
+      if(dx*dx+dz*dz>groundRadiusSquared)continue;
+      for(let j=0;j<6;j++)this.groundVisibleData[groundCursor++]=this.groundInstanceData[source+j];
+    }
+    const groundDrawCount=groundCursor/6;
+    gl.bindBuffer(gl.ARRAY_BUFFER,this.groundInstanceBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER,this.groundVisibleData.subarray(0,groundCursor),gl.DYNAMIC_DRAW);
+    this.instanceBuffersCulled=true;
     if((this.mode==="world" || this.mode==="first-person") && treeDrawCount>0){
       gl.useProgram(this.treeProgram);gl.uniformMatrix4fv(this.treeMvpLocation,false,mvp);
       gl.bindVertexArray(this.treeVao);gl.drawArraysInstanced(gl.TRIANGLES,0,this.treeVertexCount,treeDrawCount);gl.bindVertexArray(null);
