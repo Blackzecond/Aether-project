@@ -109,6 +109,14 @@ void main() {
   } else {
     vec3 base = terrainColor(height, slope);
     vec2 texCoord = vPosition.xz;
+    float grassSuitability=(1.0-smoothstep(0.30,0.58,height))*(1.0-smoothstep(0.12,0.52,slope))*smoothstep(0.018,0.10,height);
+    float meadowPatch=fbm2(texCoord*5.2+vec2(13.7,4.1));
+    float meadowDetail=fbm2(texCoord*28.0+vec2(2.3,17.9));
+    float grassGrain=noise2(texCoord*260.0+vec2(meadowDetail*3.0,meadowPatch*2.0));
+    vec3 meadowColor=mix(vec3(0.16,0.29,0.105),vec3(0.31,0.43,0.16),meadowPatch*0.72+meadowDetail*0.28);
+    meadowColor*=0.91+grassGrain*0.16;
+    float meadowCoverage=grassSuitability*(0.48+smoothstep(0.30,0.68,meadowPatch)*0.44);
+    base=mix(base,meadowColor,meadowCoverage);
     float broadTexture = fbm2(texCoord * 18.0);
     float stoneGrain = fbm2(texCoord * 74.0);
     float fineGrain = noise2(texCoord * 190.0);
@@ -185,24 +193,24 @@ function buildGroundCoverGeometry(): Float32Array {
     nx/=len;ny/=len;nz/=len;
     for(const p of [a,b,c])out.push(p[0],p[1],p[2],nx,ny,nz,kind);
   };
-  const blade=(angle:number,width:number,height:number,bend:number,kind:number)=>{
-    const dx=Math.cos(angle),dz=Math.sin(angle),px=-dz,pz=dx,steps=4;
+  const blade=(angle:number,width:number,height:number,bend:number,kind:number,rootX=0,rootZ=0)=>{
+    const dx=Math.cos(angle),dz=Math.sin(angle),px=-dz,pz=dx,steps=3;
     for(let i=0;i<steps;i++){
       const t0=i/steps,t1=(i+1)/steps;
       const curve=(t:number)=>bend*t*t;
       const w0=width*(1-t0*0.88),w1=width*(1-t1*0.88);
       const y0=height*t0,y1=height*t1;
       const cx0=dx*curve(t0),cz0=dz*curve(t0),cx1=dx*curve(t1),cz1=dz*curve(t1);
-      const a=[cx0-px*w0,y0,cz0-pz*w0],b=[cx0+px*w0,y0,cz0+pz*w0];
-      const c=[cx1+px*w1,y1,cz1+pz*w1],d=[cx1-px*w1,y1,cz1-pz*w1];
+      const a=[rootX+cx0-px*w0,y0,rootZ+cz0-pz*w0],b=[rootX+cx0+px*w0,y0,rootZ+cz0+pz*w0];
+      const c=[rootX+cx1+px*w1,y1,rootZ+cz1+pz*w1],d=[rootX+cx1-px*w1,y1,rootZ+cz1-pz*w1];
       tri(a,b,c,kind);tri(a,c,d,kind);
       tri(c,b,a,kind);tri(d,c,a,kind);
     }
   };
   // Grass blades are curved, tapered strips, with varied azimuth and lean.
-  for(let i=0;i<12;i++){
-    const a=i*2.39996;
-    blade(a,0.035+(i%3)*0.009,0.62+(i%5)*0.105,0.10+(i%4)*0.055,0);
+  for(let i=0;i<8;i++){
+    const a=i*2.39996,r=0.18+(i%3)*0.10;
+    blade(a,0.045+(i%3)*0.012,0.66+(i%4)*0.12,0.12+(i%3)*0.06,0,Math.cos(a)*r,Math.sin(a)*r);
   }
   // Fern fronds: arched stems with paired leaflets, not solid triangular fans.
   for(let i=0;i<6;i++){
