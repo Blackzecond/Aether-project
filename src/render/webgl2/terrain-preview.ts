@@ -488,7 +488,6 @@ export class TerrainPreviewRenderer {
   private readonly groundGeometryRanges:readonly {first:number;count:number}[];
   private groundKindStarts=[0,0,0,0];
   private groundKindCounts=[0,0,0,0];
-  private treeCount = 0;
   private treeInstanceData = new Float32Array(0);
   private treeVisibleData = new Float32Array(0);
   private treeSpatialBins = new Map<string,number[]>();
@@ -722,7 +721,7 @@ export class TerrainPreviewRenderer {
   setVegetation(instances: readonly VegetationInstance[]): void {
     const data=new Float32Array(instances.length*6);
     for(let i=0;i<instances.length;i++){const item=instances[i],offset=i*6;data[offset]=item.x;data[offset+1]=item.y;data[offset+2]=item.z;data[offset+3]=item.height;data[offset+4]=item.tint;data[offset+5]=item.species;}
-    this.treeCount=instances.length;this.treeInstanceData=data;this.treeVisibleData=new Float32Array(data.length);
+    this.treeInstanceData=data;this.treeVisibleData=new Float32Array(data.length);
     this.treeSpatialBins=buildInstanceSpatialBins(data);
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER,this.treeInstanceBuffer);this.gl.bufferData(this.gl.ARRAY_BUFFER,data,this.gl.STATIC_DRAW);
   }
