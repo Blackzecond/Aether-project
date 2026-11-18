@@ -217,6 +217,10 @@ describe("world foundation v2", () => {
     expect(first.instances.length).toBeLessThan(10000);
     expect(first.groundCover.length).toBeGreaterThan(1000);
     expect(new Set(first.instances.map((tree) => tree.species)).size).toBeGreaterThan(1);
+    const treeHeights=first.instances.map(tree=>tree.height);
+    expect(Math.min(...treeHeights)).toBeLessThan(0.025);
+    expect(Math.max(...treeHeights)).toBeGreaterThan(0.075);
+    expect(Math.max(...treeHeights)/Math.max(0.001,Math.min(...treeHeights))).toBeGreaterThan(3);
     const sample = first.instances.slice(0, 180);
     for (let i = 0; i < sample.length; i += 1) {
       for (let j = i + 1; j < sample.length; j += 1) {
