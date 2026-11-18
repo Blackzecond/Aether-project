@@ -147,7 +147,7 @@ void main() {
 }`;
 
 
-const treeVertexSource = "#version 300 es\nprecision highp float;\nlayout(location=0) in vec3 aPosition;\nlayout(location=1) in vec3 aNormal;\nlayout(location=2) in vec3 iOffset;\nlayout(location=3) in float iScale;\nlayout(location=4) in float iTint;\nlayout(location=5) in float iSpecies;\nuniform mat4 uMvp;\nout vec3 vNormal;\nout float vHeight;\nout float vTint;\nout float vSpecies;\nvoid main(){float angle=iTint*6.2831853;mat2 rotation=mat2(cos(angle),-sin(angle),sin(angle),cos(angle));vec3 local=aPosition;float species=floor(iSpecies+0.5);float crown=0.82+fract(iTint*19.17)*0.34;if(species<0.5){local.xz*=1.12+0.10*sin(aPosition.y*5.0);}else if(species<1.5){local.xz*=mix(1.28,0.48,smoothstep(0.20,1.0,aPosition.y));}else{local.xz*=0.72;local.y*=1.16;}local*=iScale;local.xz=rotation*local.xz;local.xz*=crown;vec3 world=local+iOffset;vNormal=aNormal;vHeight=aPosition.y;vTint=iTint;vSpecies=iSpecies;gl_Position=uMvp*vec4(world,1.0);}";
+const treeVertexSource = "#version 300 es\nprecision highp float;\nlayout(location=0) in vec3 aPosition;\nlayout(location=1) in vec3 aNormal;\nlayout(location=2) in vec3 iOffset;\nlayout(location=3) in float iScale;\nlayout(location=4) in float iTint;\nlayout(location=5) in float iSpecies;\nuniform mat4 uMvp;\nout vec3 vNormal;\nout float vHeight;\nout float vTint;\nout float vSpecies;\nvoid main(){float angle=iTint*6.2831853;mat2 rotation=mat2(cos(angle),-sin(angle),sin(angle),cos(angle));vec3 local=aPosition;vec3 normal=aNormal;float species=floor(iSpecies+0.5);float crown=0.82+fract(iTint*19.17)*0.34;float radialScale=1.0,verticalScale=1.0;if(species<0.5){radialScale=1.12+0.10*sin(aPosition.y*5.0);local.xz*=radialScale;}else if(species<1.5){radialScale=mix(1.28,0.48,smoothstep(0.20,1.0,aPosition.y));local.xz*=radialScale;}else{radialScale=0.72;verticalScale=1.16;local.xz*=radialScale;local.y*=verticalScale;}normal=normalize(vec3(normal.x/radialScale,normal.y/verticalScale,normal.z/radialScale));local*=iScale;local.xz=rotation*local.xz;normal.xz=rotation*normal.xz;local.xz*=crown;normal.xz/=crown;vec3 world=local+iOffset;vNormal=normal;vHeight=aPosition.y;vTint=iTint;vSpecies=iSpecies;gl_Position=uMvp*vec4(world,1.0);}";
 const treeFragmentSource = "#version 300 es\nprecision highp float;\nin vec3 vNormal;in float vHeight;in float vTint;in float vSpecies;out vec4 outColor;\nvoid main(){vec3 n=normalize(vNormal);vec3 light=normalize(vec3(-0.45,0.82,0.36));float diffuse=max(dot(n,light),0.0);vec3 bark=mix(vec3(0.19,0.13,0.085),vec3(0.34,0.23,0.13),vTint*0.55);vec3 leaf;if(vSpecies<0.5)leaf=mix(vec3(0.055,0.20,0.085),vec3(0.24,0.43,0.18),vTint*0.72);else if(vSpecies<1.5)leaf=mix(vec3(0.045,0.16,0.12),vec3(0.16,0.34,0.23),vTint*0.72);else leaf=mix(vec3(0.18,0.20,0.08),vec3(0.43,0.43,0.16),vTint*0.72);vec3 color=vHeight<0.38?bark:leaf;color*=0.42+diffuse*0.72;outColor=vec4(color,1.0);}";
 const groundVertexSource = `#version 300 es
 precision highp float;
@@ -159,13 +159,10 @@ layout(location=4) in float iScale;
 layout(location=5) in float iTint;
 layout(location=6) in float iKind;
 uniform mat4 uMvp;
-uniform vec3 uCameraPosition;
-uniform float uRange;
 out vec3 vNormal;
 out float vTint;
 out float vKind;
 void main(){
-  if(abs(aKind-iKind)>0.1 || distance(iOffset.xz,uCameraPosition.xz)>uRange){gl_Position=vec4(2.0,2.0,2.0,1.0);return;}
   vec3 world=aPosition*iScale+iOffset;
   vNormal=aNormal;vTint=iTint;vKind=iKind;gl_Position=uMvp*vec4(world,1.0);
 }`;
@@ -181,16 +178,19 @@ void main(){
   else base=mix(vec3(0.25,0.25,0.22),vec3(0.48,0.46,0.39),vTint);
   outColor=vec4(base*(0.52+diffuse*0.68),1.0);
 }`;
-function buildGroundCoverGeometry(): Float32Array {
+interface GroundGeometryData { readonly data:Float32Array; readonly ranges:readonly {first:number;count:number}[]; }
+function buildGroundCoverGeometry(): GroundGeometryData {
   const out:number[]=[];
+  const ranges=Array.from({length:4},()=>({first:0,count:0}));
   const tri=(a:number[],b:number[],c:number[],kind:number)=>{
     const ux=b[0]-a[0],uy=b[1]-a[1],uz=b[2]-a[2],vx=c[0]-a[0],vy=c[1]-a[1],vz=c[2]-a[2];
     let nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;const len=Math.hypot(nx,ny,nz)||1;
     nx/=len;ny/=len;nz/=len;
+    const range=ranges[kind];if(range.count===0)range.first=out.length/7;range.count+=3;
     for(const p of [a,b,c])out.push(p[0],p[1],p[2],nx,ny,nz,kind);
   };
   const blade=(angle:number,width:number,height:number,bend:number,kind:number,rootX=0,rootZ=0)=>{
-    const dx=Math.cos(angle),dz=Math.sin(angle),px=-dz,pz=dx,steps=3;
+    const dx=Math.cos(angle),dz=Math.sin(angle),px=-dz,pz=dx,steps=4;
     for(let i=0;i<steps;i++){
       const t0=i/steps,t1=(i+1)/steps;
       const curve=(t:number)=>bend*t*t;
@@ -204,16 +204,16 @@ function buildGroundCoverGeometry(): Float32Array {
     }
   };
   // Grass blades are curved, tapered strips, with varied azimuth and lean.
-  for(let i=0;i<8;i++){
-    const a=i*2.39996,r=0.18+(i%3)*0.10;
-    blade(a,0.045+(i%3)*0.012,0.66+(i%4)*0.12,0.12+(i%3)*0.06,0,Math.cos(a)*r,Math.sin(a)*r);
+  for(let i=0;i<4;i++){
+    const a=i*Math.PI*0.5+0.31,r=0.12+(i%2)*0.12;
+    blade(a,0.052+(i%2)*0.012,0.72+(i%3)*0.16,0.18+(i%2)*0.07,0,Math.cos(a)*r,Math.sin(a)*r);
   }
   // Fern fronds: arched stems with paired leaflets, not solid triangular fans.
-  for(let i=0;i<6;i++){
-    const a=i*Math.PI/3,dx=Math.cos(a),dz=Math.sin(a),px=-dz,pz=dx;
+  for(let i=0;i<4;i++){
+    const a=i*Math.PI/2+0.22,dx=Math.cos(a),dz=Math.sin(a),px=-dz,pz=dx;
     const stem=(t:number)=>[dx*t*0.62,0.05+Math.sin(t*Math.PI)*0.24+t*0.25,dz*t*0.62];
-    for(let j=0;j<5;j++){
-      const t=0.12+j*0.16,p=stem(t),q=stem(Math.min(1,t+0.12)),leaf=0.10*(1-t*0.45);
+    for(let j=0;j<4;j++){
+      const t=0.14+j*0.19,p=stem(t),q=stem(Math.min(1,t+0.15)),leaf=0.105*(1-t*0.45);
       tri(p,[p[0]+px*leaf,p[1]+0.035,p[2]+pz*leaf],q,1);
       tri(p,[p[0]-px*leaf,p[1]+0.035,p[2]-pz*leaf],q,1);
     }
@@ -227,7 +227,7 @@ function buildGroundCoverGeometry(): Float32Array {
   const rockRing=[[0.52,0.13,0.05],[0.26,0.16,0.43],[-0.34,0.12,0.40],[-0.53,0.11,-0.20],[-0.10,0.18,-0.48],[0.38,0.13,-0.36]];
   const top=[0.02,0.25,0.01],bottom=[-0.02,0.015,-0.01];
   for(let i=0;i<rockRing.length;i++){tri(top,rockRing[i],rockRing[(i+1)%rockRing.length],3);tri(bottom,rockRing[(i+1)%rockRing.length],rockRing[i],3);}
-  return new Float32Array(out);
+  return {data:new Float32Array(out),ranges};
 }
 
 function buildTreeGeometry(): Float32Array {
@@ -245,11 +245,16 @@ function buildTreeGeometry(): Float32Array {
     let vx=uy*ref[2]-uz*ref[1],vy=uz*ref[0]-ux*ref[2],vz=ux*ref[1]-uy*ref[0];
     const vl=Math.hypot(vx,vy,vz)||1;vx/=vl;vy/=vl;vz/=vl;
     const wx=uy*vz-uz*vy,wy=uz*vx-ux*vz,wz=ux*vy-uy*vx;
+    const smoothTri=(p0:number[],n0:number[],p1:number[],n1:number[],p2:number[],n2:number[])=>{
+      for(const [p,n] of [[p0,n0],[p1,n1],[p2,n2]] as const)out.push(p[0],p[1],p[2],n[0],n[1],n[2]);
+    };
+    const ring=(center:number[],r:number,t:number)=>[center[0]+(vx*Math.cos(t)+wx*Math.sin(t))*r,center[1]+(vy*Math.cos(t)+wy*Math.sin(t))*r,center[2]+(vz*Math.cos(t)+wz*Math.sin(t))*r];
     for(let i=0;i<segments;i++){
       const p=i/segments*Math.PI*2,q=(i+1)/segments*Math.PI*2;
-      const ring=(center:number[],r:number,t:number)=>[center[0]+(vx*Math.cos(t)+wx*Math.sin(t))*r,center[1]+(vy*Math.cos(t)+wy*Math.sin(t))*r,center[2]+(vz*Math.cos(t)+wz*Math.sin(t))*r];
+      const radial=(t:number)=>{const n=normalize([vx*Math.cos(t)+wx*Math.sin(t),vy*Math.cos(t)+wy*Math.sin(t),vz*Math.cos(t)+wz*Math.sin(t)]);return n;};
       const a0=ring(a,ra,p),a1=ring(a,ra,q),b0=ring(b,rb,p),b1=ring(b,rb,q);
-      tri(a0,b0,a1);tri(a1,b0,b1);
+      const np=radial(p),nq=radial(q);
+      smoothTri(a0,np,b0,np,a1,nq);smoothTri(a1,nq,b0,np,b1,nq);
     }
   };
   const leaf=(base:number[],tip:number[],width:number,phase:number)=>{
@@ -268,12 +273,12 @@ function buildTreeGeometry(): Float32Array {
     const start=[Math.cos(angle)*0.035,0.105,Math.sin(angle)*0.035];
     const middle=[Math.cos(angle)*0.16,0.035,Math.sin(angle)*0.16];
     const tip=[Math.cos(angle)*0.30,-0.045,Math.sin(angle)*0.30];
-    tube(start,middle,0.034,0.022,5);
-    tube(middle,tip,0.022,0.0035,5);
+    tube(start,middle,0.034,0.022,8);
+    tube(middle,tip,0.022,0.0035,7);
   }
   // A tapered trunk and tiered, asymmetrical branches form the tree silhouette.
   const trunk0=[0,0,0],trunk1=[0.018,0.36,-0.008],trunk2=[-0.012,0.70,0.012],trunk3=[0.015,1,0];
-  tube(trunk0,trunk1,0.075,0.052,8);tube(trunk1,trunk2,0.052,0.029,7);tube(trunk2,trunk3,0.029,0.008,6);
+  tube(trunk0,trunk1,0.075,0.052,14);tube(trunk1,trunk2,0.052,0.029,12);tube(trunk2,trunk3,0.029,0.008,10);
   for(let tier=0;tier<6;tier++){
     const y=0.30+tier*0.11;
     const center=[Math.sin(tier*1.7)*0.018,y,Math.cos(tier*1.3)*0.014];
@@ -401,8 +406,9 @@ export class TerrainPreviewRenderer {
   private readonly groundGeometryBuffer: WebGLBuffer;
   private readonly groundInstanceBuffer: WebGLBuffer;
   private readonly groundMvpLocation: WebGLUniformLocation;
-  private readonly groundCameraLocation: WebGLUniformLocation;
-  private readonly groundRangeLocation: WebGLUniformLocation;
+  private readonly groundGeometryRanges:readonly {first:number;count:number}[];
+  private groundKindStarts=[0,0,0,0];
+  private groundKindCounts=[0,0,0,0];
   private groundVertexCount = 0;
   private groundCount = 0;
   private treeCount = 0;
@@ -479,13 +485,12 @@ export class TerrainPreviewRenderer {
     gl.attachShader(groundProgram,groundVs);gl.attachShader(groundProgram,groundFs);gl.linkProgram(groundProgram);gl.deleteShader(groundVs);gl.deleteShader(groundFs);
     if(!gl.getProgramParameter(groundProgram,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(groundProgram)??"Ground cover program link failed");
     this.groundProgram=groundProgram;this.groundMvpLocation=gl.getUniformLocation(groundProgram,"uMvp")!;
-    this.groundCameraLocation=gl.getUniformLocation(groundProgram,"uCameraPosition")!;
-    this.groundRangeLocation=gl.getUniformLocation(groundProgram,"uRange")!;
+    
     const groundVao=gl.createVertexArray(),groundGeometry=gl.createBuffer(),groundInstances=gl.createBuffer();
     if(!groundVao||!groundGeometry||!groundInstances)throw new Error("ไม่สามารถจองหน่วยความจำพืชพื้นได้");
     this.groundVao=groundVao;this.groundGeometryBuffer=groundGeometry;this.groundInstanceBuffer=groundInstances;
-    const groundGeometryData=buildGroundCoverGeometry();this.groundVertexCount=groundGeometryData.length/7;
-    gl.bindVertexArray(groundVao);gl.bindBuffer(gl.ARRAY_BUFFER,groundGeometry);gl.bufferData(gl.ARRAY_BUFFER,groundGeometryData,gl.STATIC_DRAW);
+    const groundGeometryData=buildGroundCoverGeometry();this.groundVertexCount=groundGeometryData.data.length/7;this.groundGeometryRanges=groundGeometryData.ranges;
+    gl.bindVertexArray(groundVao);gl.bindBuffer(gl.ARRAY_BUFFER,groundGeometry);gl.bufferData(gl.ARRAY_BUFFER,groundGeometryData.data,gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,28,0);
     gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,3,gl.FLOAT,false,28,12);
     gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,1,gl.FLOAT,false,28,24);
@@ -642,15 +647,20 @@ export class TerrainPreviewRenderer {
   }
 
   setGroundCover(instances: readonly GroundCoverInstance[]): void {
+    const buckets=[0,1,2,3].map(()=>[] as GroundCoverInstance[]);
+    for(const item of instances)buckets[item.kind].push(item);
     const data=new Float32Array(instances.length*6);
-    for(let i=0;i<instances.length;i++){
-      const item=instances[i],offset=i*6;
-      data[offset]=item.x;data[offset+1]=item.y;data[offset+2]=item.z;
-      data[offset+3]=item.scale;data[offset+4]=item.tint;data[offset+5]=item.kind;
+    let cursor=0;
+    for(let kind=0;kind<4;kind++){
+      this.groundKindStarts[kind]=cursor/6;this.groundKindCounts[kind]=buckets[kind].length;
+      for(const item of buckets[kind]){
+        data[cursor++]=item.x;data[cursor++]=item.y;data[cursor++]=item.z;
+        data[cursor++]=item.scale;data[cursor++]=item.tint;data[cursor++]=item.kind;
+      }
     }
     this.groundCount=instances.length;this.groundInstanceData=data;this.groundVisibleData=new Float32Array(data.length);
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER,this.groundInstanceBuffer);
-    this.gl.bufferData(this.gl.ARRAY_BUFFER,data,this.gl.STATIC_DRAW);
+    this.gl.bufferData(this.gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);
   }
 
   setTerrain(field: Heightfield): void {
@@ -892,37 +902,52 @@ export class TerrainPreviewRenderer {
       gl.drawElements(gl.TRIANGLES,activeLod?.indexCount??this.triangleCount,gl.UNSIGNED_INT,0);
     }
     gl.bindVertexArray(null);
-    // CPU-side instance culling keeps the GPU from processing distant grass blades.
-    // World view keeps a broad tree horizon but only detailed ground cover near the camera.
-    const treeRadius=exploring?0.28:2.45,groundRadius=exploring?0.22:1.35;
+    // Keep distant vegetation in the terrain material; geometry is reserved for nearby detail.
+    const focus=exploring?camera:this.cameraTarget;
+    const treeRadius=exploring?0.28:2.15;
+    const groundRadius=exploring?0.20:(this.distance<this.fitDistance*0.65?1.15:0.82);
     const treeRadiusSquared=treeRadius*treeRadius,groundRadiusSquared=groundRadius*groundRadius;
     let treeCursor=0;
     for(let i=0;i<this.treeCount;i++){
-      const source=i*6,dx=this.treeInstanceData[source]-camera[0],dz=this.treeInstanceData[source+2]-camera[2];
+      const source=i*6,dx=this.treeInstanceData[source]-focus[0],dz=this.treeInstanceData[source+2]-focus[2];
       if(dx*dx+dz*dz>treeRadiusSquared)continue;
       for(let j=0;j<6;j++)this.treeVisibleData[treeCursor++]=this.treeInstanceData[source+j];
     }
     const treeDrawCount=treeCursor/6;
     gl.bindBuffer(gl.ARRAY_BUFFER,this.treeInstanceBuffer);
     gl.bufferSubData(gl.ARRAY_BUFFER,0,this.treeVisibleData.subarray(0,treeCursor));
+    const visibleStarts=[0,0,0,0],visibleCounts=[0,0,0,0];
     let groundCursor=0;
-    for(let i=0;i<this.groundCount;i++){
-      const source=i*6,dx=this.groundInstanceData[source]-camera[0],dz=this.groundInstanceData[source+2]-camera[2];
-      if(dx*dx+dz*dz>groundRadiusSquared)continue;
-      for(let j=0;j<6;j++)this.groundVisibleData[groundCursor++]=this.groundInstanceData[source+j];
+    for(let kind=0;kind<4;kind++){
+      visibleStarts[kind]=groundCursor/6;
+      const start=this.groundKindStarts[kind]*6,end=start+this.groundKindCounts[kind]*6;
+      for(let source=start;source<end;source+=6){
+        const dx=this.groundInstanceData[source]-focus[0],dz=this.groundInstanceData[source+2]-focus[2];
+        if(dx*dx+dz*dz>groundRadiusSquared)continue;
+        for(let j=0;j<6;j++)this.groundVisibleData[groundCursor++]=this.groundInstanceData[source+j];
+        visibleCounts[kind]++;
+      }
     }
-    const groundDrawCount=groundCursor/6;
     gl.bindBuffer(gl.ARRAY_BUFFER,this.groundInstanceBuffer);
     gl.bufferSubData(gl.ARRAY_BUFFER,0,this.groundVisibleData.subarray(0,groundCursor));
     if((this.mode==="world" || this.mode==="first-person") && treeDrawCount>0){
       gl.useProgram(this.treeProgram);gl.uniformMatrix4fv(this.treeMvpLocation,false,mvp);
       gl.bindVertexArray(this.treeVao);gl.drawArraysInstanced(gl.TRIANGLES,0,this.treeVertexCount,treeDrawCount);gl.bindVertexArray(null);
     }
-    if((this.mode==="world" || this.mode==="first-person") && groundDrawCount>0){
+    if(this.mode==="world" || this.mode==="first-person"){
       gl.useProgram(this.groundProgram);gl.uniformMatrix4fv(this.groundMvpLocation,false,mvp);
-      gl.uniform3f(this.groundCameraLocation,camera[0],camera[1],camera[2]);
-      gl.uniform1f(this.groundRangeLocation,exploring?0.22:2.6);
-      gl.bindVertexArray(this.groundVao);gl.drawArraysInstanced(gl.TRIANGLES,0,this.groundVertexCount,groundDrawCount);gl.bindVertexArray(null);
+      gl.bindVertexArray(this.groundVao);gl.bindBuffer(gl.ARRAY_BUFFER,this.groundInstanceBuffer);
+      for(let kind=0;kind<4;kind++){
+        const count=visibleCounts[kind],range=this.groundGeometryRanges[kind];
+        if(count===0||range.count===0)continue;
+        const byteOffset=visibleStarts[kind]*24;
+        gl.vertexAttribPointer(3,3,gl.FLOAT,false,24,byteOffset);
+        gl.vertexAttribPointer(4,1,gl.FLOAT,false,24,byteOffset+12);
+        gl.vertexAttribPointer(5,1,gl.FLOAT,false,24,byteOffset+16);
+        gl.vertexAttribPointer(6,1,gl.FLOAT,false,24,byteOffset+20);
+        gl.drawArraysInstanced(gl.TRIANGLES,range.first,range.count,count);
+      }
+      gl.bindVertexArray(null);
     }
     if((this.mode==="world" || this.mode==="first-person") && this.waterVertexCount>0){
       gl.useProgram(this.waterProgram);gl.uniformMatrix4fv(this.waterMvpLocation,false,mvp);gl.bindVertexArray(this.waterVao);
